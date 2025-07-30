@@ -159,8 +159,7 @@ void KernelPreSetup() {
 __attribute__((noreturn))
 void KernelMain(BOOT_INFO *BootInfoArg) {
     init_serial();
-    serial_print("Copyright UNT University 1998 - 2025\n");
-    serial_print("UnOS Krnl since 2025!\n\n");
+    serial_print("UnOS Kernel (C) 2025 ConoCS | GPLv3 Licensed\n\n");
     serial_print("Kernel started\n");
 
     KernelPreSetup();
