@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "com.h": "c",
+        "scheduler.h": "c",
+        "cstdint": "cpp",
+        "command.h": "c",
+        "idt.h": "c",
+        "stdint.h": "c",
+        "string.h": "c",
+        "fat32.h": "c",
+        "terminal.h": "c"
+    }
+}

@@ -1,0 +1,11 @@
+#ifndef _COMMAND_TERMINAL_
+#define _COMMAND_TERMINAL_
+
+void echo(const char *string);
+void party(const char *wowo);
+void help(const char *helpcommand);
+void gettick(const char *arg);
+void waitfortick(const char *arg);
+void trybuffer(const char *argcount);
+
+#endif
