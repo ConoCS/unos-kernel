@@ -7,5 +7,6 @@ void help(const char *helpcommand);
 void gettick(const char *arg);
 void waitfortick(const char *arg);
 void trybuffer(const char *argcount);
+void uptime(const char *arg);
 
 #endif

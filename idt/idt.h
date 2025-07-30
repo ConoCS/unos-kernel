@@ -21,4 +21,7 @@ typedef struct {
 
 uint64_t gettick_handler();
 
+extern volatile uint32_t minute;
+extern volatile uint8_t second;
+
 #endif

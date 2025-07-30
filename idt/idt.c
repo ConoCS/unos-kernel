@@ -25,6 +25,9 @@ extern void isr32();
 extern void isr33();
 static struct IDTEntry idt[256];
 
+volatile uint32_t minute = 0;
+volatile uint8_t second = 0;
+
 static inline void outb(uint16_t port, uint8_t val) {
     asm volatile ("outb %0, %1" : : "a"(val), "Nd"(port));
 }

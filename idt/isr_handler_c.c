@@ -77,13 +77,14 @@ void irq_handler_c(registers_t *regs, uint64_t irq_number) {
     outb(0x20, 0x20); // Master PIC
 
     tick++;
-    //serial_print("TICK: ");
-    //serial_print_hex((uint64_t)tick);
-    //serial_print("\n");
-
-    //if (tick % 100 == 0) {
-        //serial_print("1 Second passed...\n");
-    //}
+    if(tick % 100 == 0) {
+        second++;
+        if (second == 60) {
+            second = 0;
+            minute++;
+        }
+        
+    }
 }
 
 uint64_t gettick_handler() {

@@ -31,6 +31,7 @@ C_SRC = \
 	$(SRC_DIR)/terminal/command/gettick.c \
 	$(SRC_DIR)/terminal/command/waitfortick.c \
 	$(SRC_DIR)/terminal/command/trybuffer.c \
+	$(SRC_DIR)/terminal/command/uptime.c \
 	$(SRC_DIR)/string/string.c \
 
 ASM_SRC = \

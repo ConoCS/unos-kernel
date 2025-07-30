@@ -24,7 +24,8 @@ void run_command(char *input) {
         {"HELP", help},
         {"GETTICK", gettick},
         {"WAITFORTICK", waitfortick},
-        {"TRYBUFFER", trybuffer}
+        {"TRYBUFFER", trybuffer},
+        {"UPTIME", uptime}
     };
 
     int num_commands = sizeof(commands) / sizeof(commands[0]);
