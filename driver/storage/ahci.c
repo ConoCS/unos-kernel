@@ -162,9 +162,8 @@ int ahci_read(HBA_PORT *port, uint64_t start_lba, uint32_t sector_count, void *b
     memset(cmdtbl, 0, sizeof(HBA_CMD_TBL) + (cmdheader->prdtl - 1) * sizeof(HBA_PRDT_ENTRY));
 
     /* 3. Setup PRDT Entry */
-    uint64_t phys = virt_to_phys((uint64_t)buffer);
-    cmdtbl->prdt_entry[0].dba = (uint32_t)phys;
-    cmdtbl->prdt_entry[0].dbau = (uint32_t)(phys >> 32);
+    cmdtbl->prdt_entry[0].dba = (uint32_t)buffer;
+    cmdtbl->prdt_entry[0].dbau = 0;
     cmdtbl->prdt_entry[0].dbc = (sector_count * 512) - 1;
     cmdtbl->prdt_entry[0].i = 1;
 
