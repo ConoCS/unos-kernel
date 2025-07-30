@@ -180,12 +180,6 @@ void KernelMain(BOOT_INFO *BootInfoArg) {
     serial_print_hex(BootInfoArg->TotalAllRam);
     serial_print("\n");
 
-    int *buffer = (int*)kmalloc(10 * sizeof(int));
-    for (int i = 0; i < 10; i++) {
-        buffer[i] = i * 10;
-        serial_printf("buffer %d : %d", i, buffer[i]);
-    }
-
     init_terminal();
 
     while(1) {
