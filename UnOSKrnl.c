@@ -10,6 +10,8 @@
 #include "Include/string.h"
 #include "driver/pci/pci.h"
 #include "driver/storage.h"
+#include "driver/storage/gpt.h"
+#include "driver/storage/fat32.h"
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -149,6 +151,24 @@ void serial_printf(const char *fmt, ...) {
  BOOT_INFO *bootInfo;
 
 
+void TryAhciRead(HBA_PORT *port, uint64_t start_lba, uint32_t sector_count) {
+    uintptr_t phys;
+    void *virt = palloc_aligned_DMA(sector_count * 512, PAGE_SIZE, &phys);
+
+    int ok = ahci_read(port, start_lba, sector_count, (void*)phys);
+    if(ok == 1) serial_print("AHCI_READ OK\n");
+
+    /* PRINT DATA */
+    uint8_t *data = (uint8_t*)virt;
+    for(int i = 0; i < sector_count * 512; i++) {
+        serial_printf("%X ", data[i]);
+        if (i % 16 == 0 && i > 0) {
+            serial_printf("\n");
+        }
+    }
+    serial_printf("\n");
+}
+
 void KernelPreSetup() {
     remap_pic();
     init_idt(); /*SETUP IDT*/
@@ -163,11 +183,11 @@ void KernelMain(BOOT_INFO *BootInfoArg) {
     serial_print("Kernel started\n");
 
     KernelPreSetup();
-     __asm__ volatile("sti");
-
+    
     init_paging(BootInfoArg);
     gopInfo = BootInfoArg->GopBootInform;
     acpiInfo = BootInfoArg->AcpiBootInform;
+    __asm__ volatile("sti");
 
     connect_to_framebuffer();
 
@@ -178,6 +198,14 @@ void KernelMain(BOOT_INFO *BootInfoArg) {
     serial_print("Memory RAM: ");
     serial_print_hex(BootInfoArg->TotalAllRam);
     serial_print("\n");
+
+    //TryAhciRead(ahci_port, 0, 1);
+    //TryAhciRead(ahci_port, 1, 1);
+    //TryAhciRead(ahci_port, 2048, 1);
+
+    ParseGPT(ahci_port);
+    ParseFAT32(ahci_port);
+    ReadDirectoryFAT32(ahci_port, 2385);
 
     init_terminal();
 

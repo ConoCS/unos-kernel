@@ -24,6 +24,8 @@ C_SRC = \
 	$(SRC_DIR)/driver/keyboard.c \
 	$(SRC_DIR)/driver/pci/pci.c \
 	$(SRC_DIR)/driver/storage/ahci.c \
+	$(SRC_DIR)/driver/storage/gpt.c \
+	$(SRC_DIR)/driver/storage/fat32.c \
 	$(SRC_DIR)/terminal/terminal.c \
 	$(SRC_DIR)/terminal/command/echo.c \
 	$(SRC_DIR)/terminal/command/party.c \
