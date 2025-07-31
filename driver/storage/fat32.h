@@ -63,6 +63,5 @@ typedef struct __attribute__((packed)) {
 } LFNEntry;
 
 void ParseFAT32(HBA_PORT *port);
-void ReadDirectoryFAT32(HBA_PORT *port, uint32_t subdirectory_cluster);
 
 #endif
