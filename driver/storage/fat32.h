@@ -2,6 +2,7 @@
 #define _FAT32_HEADER_
 
 #include <stdint.h>
+#include "../storage.h"
 
 typedef struct __attribute__((packed)) {
     uint8_t  jump_boot[3];         // Jump instruction to boot code
@@ -62,6 +63,22 @@ typedef struct __attribute__((packed)) {
     uint16_t name3[2];            // 2 karakter terakhir (total 13 karakter/entry)
 } LFNEntry;
 
+typedef struct __attribute__((packed)) {
+    uint32_t sector_cluster;
+    char LFNFolderName[256];
+} SubdirectoryCluster;
+
+typedef struct {
+    FAT32BootSector boot_sector;
+    uint64_t        first_data_sector;
+    uint32_t        sectors_per_cluster;
+    uint32_t        root_cluster;
+} FAT32Info;
+
+extern FAT32Info Fat32Info;
+extern SubdirectoryCluster GlobalSC[100];
+
 void ParseFAT32(HBA_PORT *port);
+void ReadDirectory(HBA_PORT *port, uint32_t cluster_number);
 
 #endif

@@ -61,6 +61,46 @@ char *strtok(char *str, const char *delim) {
     return start;
 }
 
+
+char* strcpy(char* dest, const char* src) {
+    char* ret = dest;
+    while ((*dest++ = *src++));  // copy sampai '\0' juga ikut
+    return ret;
+}
+
+char* strcat(char* dest, const char* src) {
+    char* ptr = dest;
+
+    // Geser ptr ke akhir string dest
+    while (*ptr != '\0') {
+        ptr++;
+    }
+
+    // Salin src ke akhir dest
+    while (*src != '\0') {
+        *ptr++ = *src++;
+    }
+
+    // Tambahkan null-terminator
+    *ptr = '\0';
+
+    return dest;
+}
+
+static int to_lower(int c) {
+    if (c >= 'A' && c <= 'Z') return c - 'A' + 'a';
+    return c;
+}
+
+int strcasecmp(const char *a, const char *b) {
+    while (*a && *b) {
+        int ca = to_lower((unsigned char)*a++);
+        int cb = to_lower((unsigned char)*b++);
+        if (ca != cb) return ca - cb;
+    }
+    return to_lower((unsigned char)*a) - to_lower((unsigned char)*b);
+}
+
 int atoi(const char *str) {
     int res = 0;
     while (*str >= '0' && *str <= '9') {

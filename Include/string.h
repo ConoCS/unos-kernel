@@ -17,5 +17,8 @@ void *memset(void *s, int c, size_t n);
 int memcmp(const void *s1, const void *s2, size_t n);
 void *memcpy (void *dest, const void *src, size_t n);
 unsigned long strtoul(const char *nptr, char **endptr, int base);
+char* strcpy(char* dest, const char* src);
+char* strcat(char* dest, const char* src);
+int strcasecmp(const char *a, const char *b);
 
 #endif
