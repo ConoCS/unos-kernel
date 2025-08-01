@@ -13,6 +13,7 @@
 #include "driver/storage/gpt.h"
 #include "driver/storage/fat32.h"
 #include "filesystem/vfs.h"
+#include "file/extension/psf.h"
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -189,9 +190,12 @@ void KernelMain(BOOT_INFO *BootInfoArg) {
     init_paging(BootInfoArg);
     gopInfo = BootInfoArg->GopBootInform;
     acpiInfo = BootInfoArg->AcpiBootInform;
-    __asm__ volatile("sti");
+    init_phys_allocator();
+
 
     connect_to_framebuffer();
+    drawfullscreen();
+    __asm__ volatile("sti");
 
     serial_print("MemoryMapSize: ");
     serial_print_hex(BootInfoArg->MemoryMapSize);
@@ -207,6 +211,24 @@ void KernelMain(BOOT_INFO *BootInfoArg) {
     VFSNode *root = kmalloc(sizeof(VFSNode));
     VFSMountFAT32Root(ahci_port, root);
     vfs_root = root;
+
+    VFSNode *file = Fat32Open(vfs_root, "/EFI/BOOT/Shell.efi");
+    if(file) {
+        size_t size = file->size;
+        void *buffer = kmalloc(size);
+        if(!buffer) {
+            serial_printf("[Error] Gagal alokasi\n");
+        }
+
+        int bytes_read = Fat32Read(file, 0, buffer, size);
+        if(bytes_read != size) {
+            serial_printf("[Error] Gagal baca file\n");
+        }
+
+        serial_printf("[OK] File %s berhasil dibaca (%d bytes)\n", file->name, bytes_read);
+    }
+    //draw_text_from_psf("/UnOS/font/Lat15-VGA16.psf", 10, 10, "Hello world", 0xFFFFFFFF);
+    
 
     init_terminal();
 
