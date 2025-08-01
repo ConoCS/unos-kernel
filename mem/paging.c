@@ -129,8 +129,6 @@ uint64_t align_up_2mb(uint64_t size) {
     return (size + 0x1FFFFF) & ~0x1FFFFF;
 }
 
-
-
 void init_paging(BOOT_INFO *bootInfo) {
     serial_print("Start mapping PML4\n");
     // MAP Kernel Identity
@@ -176,6 +174,8 @@ void init_paging(BOOT_INFO *bootInfo) {
     serial_print("Paging activated\n");
     serial_printf("Paging active at: %X\n\n", pml4_table);
 }
+
+
 
 uint64_t virt_to_phys(uint64_t virtual_addr) {
     uint64_t pml_index = (virtual_addr >> 39) & 0x1FF;

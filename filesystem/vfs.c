@@ -25,10 +25,14 @@ void VFSMountFAT32Root(HBA_PORT *port, VFSNode *mount_point) {
     uint32_t fsz      = Fat32Info.boot_sector.fat_size_16 ? Fat32Info.boot_sector.fat_size_16 : Fat32Info.boot_sector.fat_size_32;
 
     Fat32Info.first_data_sector =  GPTGlobal->first_lba + reserved + fats * fsz;
+    Fat32Info.fat_start_sector =  GPTGlobal->first_lba + reserved;
     Fat32Info.sectors_per_cluster = Fat32Info.boot_sector.sectors_per_cluster;
     Fat32Info.root_cluster = Fat32Info.boot_sector.root_cluster;
 
     serial_printf("[OK] FAT32 Mounted: data_sector=%llu, root_cluster=%u\n", Fat32Info.first_data_sector, Fat32Info.root_cluster);
+
+    serial_printf("[DEBUG] FAT32 Info: fat_start_sector=%u, first_data_sector=%llu, sectors_per_cluster=%u, root_cluster=%u\n", 
+              Fat32Info.fat_start_sector, Fat32Info.first_data_sector, Fat32Info.sectors_per_cluster, Fat32Info.root_cluster);
 
     mount_point->type = VFS_TYPE_DIR;
     strcpy(mount_point->name, "/");
@@ -40,7 +44,7 @@ void VFSMountFAT32Root(HBA_PORT *port, VFSNode *mount_point) {
     mount_point->fs_data = port;
 }
 
-uint32_t fat32_next_cluster(uint32_t cluster) {
+uint32_t fat32_next_cluster(HBA_PORT *port, uint32_t cluster) {
     // 1. Hitung byte-offset dan sektor FAT untuk entri ini
     serial_printf("Checkpoint 10A <- fat32_next_cluster entry\n");
     uint64_t byte_off = (uint64_t)cluster * 4;
@@ -48,19 +52,37 @@ uint32_t fat32_next_cluster(uint32_t cluster) {
     uint32_t fat_sect = Fat32Info.fat_start_sector + (byte_off / bps);
     uint32_t off_in   = byte_off % bps;
 
+    serial_printf("[DEBUG] Cluster: %u, FAT Sector: %u, Offset in Sector: %u\n", cluster, fat_sect, off_in);
+
     // 2. Baca sektor FAT ke buffer DMA
     uintptr_t phys2;
     void *virt2 = palloc_aligned_DMA(bps, PAGE_SIZE, &phys2);
-    if(!ahci_read(ahci_port, fat_sect, 1, (void*)phys2)) {
+    serial_printf("Checkpoint 10BA kode udah diganti\n");
+    if(!ahci_read(port, fat_sect, 1, (void*)phys2)) {
         serial_printf("[E] FAT next-cluster read fail @ sector %u\n", fat_sect);
+        pfree_aligned_DMA(virt2, bps);
+        serial_printf("Checkpoint 10B <- fat32_next_cluster exit\n");
         return FAT32_EOC;
     }
-    serial_printf("Checkpoint 10B\n");
+    serial_printf("Checkpoint 10C\n");
 
     // 3. Ambil 32-bit little endian, mask 28-bit
     uint32_t raw = ((uint32_t*)virt2)[off_in/4] & 0x0FFFFFFF;
-    serial_printf("Checkpoint 10C\n");
-    return (raw >= FAT32_EOC) ? FAT32_EOC : raw;
+    if (raw == cluster) {
+        serial_printf("[Error] Self-loop at %u → treating as EOC\n", cluster);
+        pfree_aligned_DMA(virt2, bps);
+        return FAT32_EOC;
+    }
+    if (raw < 2 || raw >= FAT32_EOC) {
+        serial_printf("[Error] Out-of-range FAT entry: %u\n", raw);
+        pfree_aligned_DMA(virt2, bps);
+        return FAT32_EOC;
+    }
+
+    serial_printf("[DEBUG] FAT Entry Raw: %u\n", raw);
+    serial_printf("Checkpoint 10D\n");
+    pfree_aligned_DMA(virt2, bps);
+    return raw;
 }
 
 VFSNode* Fat32Lookup(VFSNode *dir, const char *name) {
@@ -284,27 +306,52 @@ int Fat32Read(VFSNode *node, size_t offset, void* buffer, size_t size) {
 
     size_t bytes_per_cluster = bps * spc;
     while(offset >= bytes_per_cluster) {
-        cluster = fat32_next_cluster(cluster);
+        cluster = fat32_next_cluster((HBA_PORT*)node->fs_data, cluster);
         if (cluster >= FAT32_EOC) return total_read;
         offset -= bytes_per_cluster;
     }
 
+    #define MAX_CLUSTERS_CHAIN 4096
+    int chain_count= 0;
+
     while(remaining > 0 && cluster < FAT32_EOC) {
+        if (++chain_count > MAX_CLUSTERS_CHAIN) {
+            serial_printf("[Error] Fat32Read: Too many clusters\n");
+            break;
+        }
+
         uint64_t sector = first_data_sector + (cluster - 2) * spc;
 
         size_t read_offset = offset;
         size_t read_len = (remaining < (bytes_per_cluster - read_offset)) ? remaining : (bytes_per_cluster - read_offset);
 
+        serial_printf("[DEBUG] Reading cluster: %u, sector: %llu\n", cluster, sector);
+        serial_printf("[DEBUG] Read offset: %llu, Read length: %llu\n", read_offset, read_len);
+
         uintptr_t phys;
         void *dma_buf = palloc_aligned_DMA(spc * bps, PAGE_SIZE, &phys);
-        if(!dma_buf) break;
-
+        if (dma_buf) {
+            map_virtual((uint64_t)dma_buf, phys, PAGE_SIZE);
+        }
+        serial_printf(" Checkpoint custom AC\n");
+       if (!dma_buf) {
+            serial_printf("[ERROR] DMA alloc fail for cluster %u\n", cluster);
+            break;
+        }
+        serial_printf(" Checkpoint custom AB\n");
         if(!ahci_read(node->fs_data, sector, spc, (void*)phys)) {
-            serial_printf("[Error] Fat32Read: Failed read cluster %u (sector %llu)", cluster, sector);
+            serial_printf("[Error] Fat32Read: Failed read cluster %u (sector %llu)\n", cluster, sector);
             pfree_aligned_DMA(dma_buf, spc * bps);
             break;
         }
+        serial_printf(" Checkpoint custom AA\n");
 
+
+        serial_printf("[MEMCPY DBG] total_read=%llu, remaining=%llu\n", total_read, remaining);
+        serial_printf("  -> user_buf = %p\n", user_buf);
+        serial_printf("  -> dst = %p\n", user_buf + total_read);
+        serial_printf("  -> dma_buf = %p (phys=0x%llx)\n", dma_buf, phys);
+        serial_printf("  -> read_offset=%zu, read_len=%zu\n", read_offset, read_len);
         memcpy(user_buf + total_read, (uint8_t*)dma_buf + read_offset, read_len);
 
         pfree_aligned_DMA(dma_buf, spc * bps);
@@ -313,13 +360,19 @@ int Fat32Read(VFSNode *node, size_t offset, void* buffer, size_t size) {
         remaining -= read_len;
         offset = 0;
 
-        cluster = fat32_next_cluster(cluster);
+        uint32_t prev_cluster = cluster;
+
+        cluster = fat32_next_cluster((HBA_PORT*)node->fs_data, cluster);
+
+        serial_printf("[CLUSTER DEBUG] prev=%u -> next=%u, total_read=%u bytes, remaining=%u bytes\n",
+                    prev_cluster, cluster, total_read, remaining);
+
         if (cluster < 2 || cluster >= FAT32_EOC)
             break;
+
     }
 
     return total_read;
-    
 }
 
 

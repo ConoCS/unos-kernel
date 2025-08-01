@@ -2,24 +2,29 @@
 #include "../Include/paging.h"
 #include "../Include/com.h"
 #include "../Include/string.h"
+#include "../driver/storage.h"
 
 #define PHYS_HEAP_START 0x1000000
+#define MAX_TRACKED_PAGES 8192 // misalnya 32MB / 4KB
 
 typedef unsigned long size_t;
 
 uint64_t heap_curr = KERNEL_HEAP_START;
-uint8_t page_bitmap[PAGE_SIZE];
+uint8_t page_bitmap[MAX_TRACKED_PAGES];
 uintptr_t base_phys_addr = 0x100000;
 extern uint64_t *kernel_pml4;
 
 
 void *palloc_page() {
-    for (int i = 0; i < PAGE_SIZE; i++) {
+    for (int i = 0; i < MAX_TRACKED_PAGES; i++) {
+        if(page_bitmap[i]) continue;
+        
         if(page_bitmap[i] == 0) {
             page_bitmap[i] = 1;
             return (void*)(base_phys_addr + i * PAGE_SIZE);
         }
     }
+    serial_printf("[palloc_page] Out of physical pages!\n");
     return NULL;
 }
 
@@ -134,6 +139,7 @@ void *palloc_aligned_DMA(size_t size, size_t align, uintptr_t *phys_out) {
     }
 
     if (phys_out) *phys_out = phys;
+    serial_printf("[DMA_ALLOC] virt=%p, phys=%p, size=%u\n", virt, (void*)phys, map_size);
     return virt;
 }
 
@@ -152,4 +158,39 @@ void pfree_aligned_DMA(void *virt, size_t size) {
 
         pmm_free((void*)phys);
     }
+}
+
+void init_phys_allocator() {
+    // Hitung berapa page kernel yang perlu diresevasi
+    extern uint64_t _kernel_start;
+    extern uint64_t _kernel_end;
+
+    uintptr_t kernel_start = (uintptr_t)&_kernel_start;
+    uintptr_t kernel_end = (uintptr_t)&_kernel_end;
+
+    // Tandai semua halaman kernel
+    for (uintptr_t addr = kernel_start; addr < kernel_end; addr += PAGE_SIZE) {
+        size_t index = (addr - base_phys_addr) / PAGE_SIZE;
+        if (index < MAX_TRACKED_PAGES)
+            page_bitmap[index] = 1;
+    }
+
+    // (Opsional) mark AHCI/ABAR area kalau kamu identitas-mapping juga
+    for (uintptr_t addr = AHCI_BASE; addr < AHCI_BASE + 0x200000; addr += PAGE_SIZE) {
+        size_t index = (addr - base_phys_addr) / PAGE_SIZE;
+        if (index < MAX_TRACKED_PAGES)
+            page_bitmap[index] = 1;
+    }
+
+    for (uintptr_t addr = abar_global; addr < abar_global + 0x200000; addr += PAGE_SIZE) {
+        size_t index = (addr - base_phys_addr) / PAGE_SIZE;
+        if (index < MAX_TRACKED_PAGES)
+            page_bitmap[index] = 1;
+    }
+
+    for (uintptr_t addr = 0x400000; addr < 0x1000000; addr += PAGE_SIZE) {
+    size_t index = (addr - base_phys_addr) / PAGE_SIZE;
+    if (index < MAX_TRACKED_PAGES)
+        page_bitmap[index] = 1;
+}
 }

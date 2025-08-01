@@ -23,3 +23,4 @@ void *palloc_aligned(size_t size, size_t align);
 uint64_t virt_to_phys(uint64_t virtual_addr);
 void *palloc_aligned_DMA(size_t size, size_t align, uintptr_t *phys_out);
 void pfree_aligned_DMA(void *virt, size_t size);
+void init_phys_allocator();
