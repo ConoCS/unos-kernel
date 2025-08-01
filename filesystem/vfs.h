@@ -3,19 +3,45 @@
 
 #define VFS_TYPE_FILE 1
 #define VFS_TYPE_DIR  2
+#define FAT32_EOC 0x0FFFFFF8u   // >> this is end‐of‐cluster‐chain
 
 #include <stdint.h>
+#include "../Include/paging.h"
 #include "../driver/storage/fat32.h"
 
+/**
+ * Struktur node dalam Virtual File System (VFS).
+ * 
+ * Mewakili entitas file atau direktori dalam sistem file virtual.
+ * Setiap node bisa punya parent dan children untuk merepresentasikan hierarki.
+ */
 typedef struct VFSNode {
+    /// Nama file atau direktori (maksimal 15 karakter + null terminator)
     char name[16];
-    uint8_t type;           // 0=file, 1=dir
+
+    /// Tipe node: 0 = file, 1 = direktori
+    uint8_t type;
+
+    /// Cluster pertama dari file/direktori (tergantung filesystem yang digunakan)
     uint32_t first_cluster;
+
+    /// Pointer ke parent node (NULL jika ini adalah root)
     struct VFSNode* parent;
+
+    /// Array pointer ke children (NULL jika tidak ada atau bukan direktori)
     struct VFSNode** children;
+
+    /// Jumlah children dalam array
     uint32_t child_count;
-    void* fs_ops;           // pointer ke fat32_ops
+
+    /// Pointer ke operasi filesystem (biasanya struct fungsi, misal fat32_ops)
+    void* fs_ops;
+
+    /// Data tambahan spesifik filesystem (misalnya info FAT32)
     void* fs_data;
+
+    // Size
+    size_t size;
 } VFSNode;
 
 typedef struct FSOperations {
@@ -63,8 +89,11 @@ typedef struct FSOperations {
 } FSOperations;
 
 extern FSOperations fat32_ops;
+extern VFSNode *vfs_root;
 
 void VFSMountFAT32Root(HBA_PORT *port, VFSNode *mount_point);
 VFSNode* Fat32Lookup(VFSNode *dir, const char *name);
+void* Fat32Open(VFSNode *cwd, const char *path);
+int Fat32Read(VFSNode *node, size_t offset, void* buffer, size_t size);
 
 #endif

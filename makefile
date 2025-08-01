@@ -34,7 +34,9 @@ C_SRC = \
 	$(SRC_DIR)/terminal/command/waitfortick.c \
 	$(SRC_DIR)/terminal/command/trybuffer.c \
 	$(SRC_DIR)/terminal/command/uptime.c \
+	$(SRC_DIR)/terminal/command/parsefat32.c \
 	$(SRC_DIR)/string/string.c \
+	$(SRC_DIR)/filesystem/vfs.c
 
 ASM_SRC = \
 	$(SRC_DIR)/boot/boot.asm \

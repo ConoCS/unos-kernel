@@ -10,6 +10,8 @@ typedef unsigned long size_t;
 uint64_t heap_curr = KERNEL_HEAP_START;
 uint8_t page_bitmap[PAGE_SIZE];
 uintptr_t base_phys_addr = 0x100000;
+extern uint64_t *kernel_pml4;
+
 
 void *palloc_page() {
     for (int i = 0; i < PAGE_SIZE; i++) {
@@ -41,6 +43,14 @@ static uint64_t next_free_phys = PHYS_HEAP_START;
 
 static inline void invlpg(void *addr) {
     asm volatile("invlpg (%0)" : : "r" (addr) : "memory");
+}
+
+void pmm_free(void *phys_addr) {
+    uintptr_t addr = (uintptr_t)phys_addr;
+    if (addr < base_phys_addr) return;
+
+    size_t index = (addr - base_phys_addr) / PAGE_SIZE;
+    page_bitmap[index] = 0;
 }
 
 void unmap_page(void *virtual_address) {
@@ -106,22 +116,27 @@ void *palloc_aligned(size_t size, size_t align) {
 }
 
 void *palloc_aligned_DMA(size_t size, size_t align, uintptr_t *phys_out) {
-    uintptr_t phys = (uintptr_t)palloc_aligned(size, align);
-
     size_t map_size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-
-    if(heap_curr & (PAGE_SIZE - 1)) {
+    
+    if (heap_curr & (PAGE_SIZE - 1)) {
         heap_curr = (heap_curr + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
     }
 
     void *virt = (void*)heap_curr;
     heap_curr += map_size;
 
-    map_virtual((uint64_t)virt, phys, map_size);
+    uintptr_t phys = 0;
+    for(size_t offset = 0; offset < map_size; offset += PAGE_SIZE) {
+        void *page = palloc_page();
+        if (!page) return NULL;
+        if (offset == 0) phys = (uintptr_t)page;
+        map_virtual((uint64_t)virt + offset, (uintptr_t)page, PAGE_SIZE);
+    }
 
-    *phys_out = phys;
+    if (phys_out) *phys_out = phys;
     return virt;
 }
+
 
 void pfree_aligned_DMA(void *virt, size_t size) {
     if(!virt || size == 0) return;
@@ -131,8 +146,10 @@ void pfree_aligned_DMA(void *virt, size_t size) {
     for(size_t offset = 0; offset < map_size; offset += PAGE_SIZE) {
         uint64_t vaddr = va + offset;
 
-        uintptr_t phys = get_physical_address(vaddr);
+        uintptr_t phys = get_physical_address((void*)vaddr);
 
-        unmap_page(vaddr);
+        unmap_page((void*)vaddr);
+
+        pmm_free((void*)phys);
     }
 }

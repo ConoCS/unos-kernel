@@ -12,6 +12,7 @@
 #include "driver/storage.h"
 #include "driver/storage/gpt.h"
 #include "driver/storage/fat32.h"
+#include "filesystem/vfs.h"
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -123,7 +124,8 @@ void serial_printf(const char *fmt, ...) {
                         serial_write_char('%');
                         serial_write_char('l');
                         serial_write_char(*(fmt + 1));
-                        fmt++;
+                        fmt+= 2;
+                        continue;
                     }
                 break;
                 case '%':
@@ -199,13 +201,12 @@ void KernelMain(BOOT_INFO *BootInfoArg) {
     serial_print_hex(BootInfoArg->TotalAllRam);
     serial_print("\n");
 
-    //TryAhciRead(ahci_port, 0, 1);
-    //TryAhciRead(ahci_port, 1, 1);
-    //TryAhciRead(ahci_port, 2048, 1);
-
     ParseGPT(ahci_port);
     ParseFAT32(ahci_port);
-    ReadDirectoryFAT32(ahci_port, 2385);
+    
+    VFSNode *root = kmalloc(sizeof(VFSNode));
+    VFSMountFAT32Root(ahci_port, root);
+    vfs_root = root;
 
     init_terminal();
 

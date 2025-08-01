@@ -25,7 +25,9 @@ void run_command(char *input) {
         {"GETTICK", gettick},
         {"WAITFORTICK", waitfortick},
         {"TRYBUFFER", trybuffer},
-        {"UPTIME", uptime}
+        {"UPTIME", uptime},
+        {"PARSEFAT32", parsefat32},
+        {"CD", cd}
     };
 
     int num_commands = sizeof(commands) / sizeof(commands[0]);

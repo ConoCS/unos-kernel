@@ -3,8 +3,6 @@
 #include "../boot/bootinfo.h"
 
 typedef unsigned long size_t;
-extern uint64_t *kernel_pml4;
-
 #define KERNEL_HEAP_START 0xFFFF800000000000
 #define KERNEL_HEAP_SIZE (10 * 1024 * 1024)
 #define KERNEL_HEAP_PHYSICAL_START 0x00400000
@@ -24,3 +22,4 @@ void *kmalloc(size_t size);
 void *palloc_aligned(size_t size, size_t align);
 uint64_t virt_to_phys(uint64_t virtual_addr);
 void *palloc_aligned_DMA(size_t size, size_t align, uintptr_t *phys_out);
+void pfree_aligned_DMA(void *virt, size_t size);

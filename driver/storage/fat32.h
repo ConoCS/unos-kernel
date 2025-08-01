@@ -73,6 +73,8 @@ typedef struct {
     uint64_t        first_data_sector;
     uint32_t        sectors_per_cluster;
     uint32_t        root_cluster;
+    uint32_t        fat_start_sector;
+    HBA_PORT        *fat_port;
 } FAT32Info;
 
 extern FAT32Info Fat32Info;

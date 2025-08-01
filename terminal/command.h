@@ -8,5 +8,7 @@ void gettick(const char *arg);
 void waitfortick(const char *arg);
 void trybuffer(const char *argcount);
 void uptime(const char *arg);
+void parsefat32(const char *arg);
+void cd(const char *arg);
 
 #endif

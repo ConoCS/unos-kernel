@@ -10,6 +10,7 @@
 
 extern void load_pml4(uint64_t *pml4);
 static uint64_t *pml4_table = (uint64_t*)0x1000;
+uint64_t *kernel_pml4;
 
 #define PAGE_SIZE 0x1000
 #define PAGE_NOCACHE 0x10
@@ -171,7 +172,7 @@ void init_paging(BOOT_INFO *bootInfo) {
 
     // Activate paging
     load_pml4(pml4_table);
-    uint64_t *kernel_pml4 = pml4_table;
+    kernel_pml4 = pml4_table;
     serial_print("Paging activated\n");
     serial_printf("Paging active at: %X\n\n", pml4_table);
 }
