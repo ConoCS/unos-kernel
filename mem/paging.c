@@ -4,11 +4,6 @@
 #include "../driver/storage.h"
 #include <stdint.h>
 
-// Bit flag untuk entri page table (x86_64 Paging)
-#define PAGE_PRESENT 0x1 // Bit 0: Page aktif (1 = ada di RAM, 0 = akan trigger page fault)
-#define PAGE_WRITABLE 0x2  // Bit 1: 1 = bisa ditulis, 0 = hanya bisa dibaca (read-only)
-#define PAGE_LARGE 0x80 // Bit 7: 1 = page ini adalah huge page (2MB atau 1GB, tergantung level-nya)
-
 #define KERNEL_HEAP_START 0xFFFF800000000000 
 #define KERNEL_HEAP_SIZE (10 * 1024 * 1024)
 #define KERNEL_HEAP_PHYSC_START 0x00400000
@@ -176,6 +171,7 @@ void init_paging(BOOT_INFO *bootInfo) {
 
     // Activate paging
     load_pml4(pml4_table);
+    uint64_t *kernel_pml4 = pml4_table;
     serial_print("Paging activated\n");
     serial_printf("Paging active at: %X\n\n", pml4_table);
 }
