@@ -202,7 +202,7 @@ void KernelMain(BOOT_INFO *BootInfoArg) {
     serial_print("\n");
 
     ParseGPT(ahci_port);
-    ParseFAT32(ahci_port);
+    //ParseFAT32(ahci_port);
     
     VFSNode *root = kmalloc(sizeof(VFSNode));
     VFSMountFAT32Root(ahci_port, root);
