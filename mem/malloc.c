@@ -15,15 +15,26 @@ uintptr_t base_phys_addr = 0x100000;
 extern uint64_t *kernel_pml4;
 
 
+int last_allocated_index = 0;
+
 void *palloc_page() {
-    for (int i = 0; i < MAX_TRACKED_PAGES; i++) {
-        if(page_bitmap[i]) continue;
-        
-        if(page_bitmap[i] == 0) {
+    for (int i = last_allocated_index; i < MAX_TRACKED_PAGES; i++) {
+        if (!page_bitmap[i]) {
             page_bitmap[i] = 1;
+            last_allocated_index = i + 1;
             return (void*)(base_phys_addr + i * PAGE_SIZE);
         }
     }
+
+    // Backtrack untuk reuse yang sudah di-free
+    for (int i = 0; i < last_allocated_index; i++) {
+        if (!page_bitmap[i]) {
+            page_bitmap[i] = 1;
+            last_allocated_index = i + 1;
+            return (void*)(base_phys_addr + i * PAGE_SIZE);
+        }
+    }
+
     serial_printf("[palloc_page] Out of physical pages!\n");
     return NULL;
 }
@@ -97,7 +108,7 @@ uint64_t get_physical_address(void *virt) {
     uint64_t *pd = (uint64_t*)(pdpt[pdpt_index] & PAGE_MASK);
     if(!pd) return 0;
 
-    uint64_t *pt = (uint64_t*)(pd[pd_index & PAGE_MASK]);
+    uint64_t *pt = (uint64_t*)(pd[pd_index] & PAGE_MASK);
     if(!pt) return 0;
 
     uint64_t phys_page = pt[pt_index] & PAGE_MASK;
