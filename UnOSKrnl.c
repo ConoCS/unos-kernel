@@ -14,6 +14,8 @@
 #include "driver/storage/fat32.h"
 #include "filesystem/vfs.h"
 #include "file/extension/psf.h"
+#include "acpi/madt.h"
+#include "acpi/acpi.h"
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -172,38 +174,34 @@ void TryAhciRead(HBA_PORT *port, uint64_t start_lba, uint32_t sector_count) {
     serial_printf("\n");
 }
 
-void KernelPreSetup() {
+void KernelPreSetup(BOOT_INFO *Info) {
     remap_pic();
     init_idt(); /*SETUP IDT*/
     init_pit(100);
     pci_scan();
-}
+    init_paging(Info);
+    bootInfo = Info;
+    gopInfo = Info->GopBootInform;
+    acpiInfo = Info->AcpiBootInform;
+    init_phys_allocator();
+    init_acpi();
+} 
 
 __attribute__((noreturn))
 void KernelMain(BOOT_INFO *BootInfoArg) {
+    __asm__ volatile("cli");
     init_serial();
     serial_print("UnOS Kernel (C) 2025 ConoCS | GPLv3 Licensed\n\n");
     serial_print("Kernel started\n");
 
-    KernelPreSetup();
+    KernelPreSetup(BootInfoArg);
     
-    init_paging(BootInfoArg);
-    gopInfo = BootInfoArg->GopBootInform;
-    acpiInfo = BootInfoArg->AcpiBootInform;
-    init_phys_allocator();
 
 
-    connect_to_framebuffer();
-    drawfullscreen();
     __asm__ volatile("sti");
-
-    serial_print("MemoryMapSize: ");
-    serial_print_hex(BootInfoArg->MemoryMapSize);
-    serial_print("\n");
-
-    serial_print("Memory RAM: ");
-    serial_print_hex(BootInfoArg->TotalAllRam);
-    serial_print("\n");
+    connect_to_framebuffer();
+    drawfullscreen(0x000000FF);
+    delay(3000);
 
     ParseGPT(ahci_port);
     //ParseFAT32(ahci_port);
@@ -212,24 +210,12 @@ void KernelMain(BOOT_INFO *BootInfoArg) {
     VFSMountFAT32Root(ahci_port, root);
     vfs_root = root;
 
-    VFSNode *file = Fat32Open(vfs_root, "/EFI/BOOT/Shell.efi");
-    if(file) {
-        size_t size = file->size;
-        void *buffer = kmalloc(size);
-        if(!buffer) {
-            serial_printf("[Error] Gagal alokasi\n");
-        }
-
-        int bytes_read = Fat32Read(file, 0, buffer, size);
-        if(bytes_read != size) {
-            serial_printf("[Error] Gagal baca file\n");
-        }
-
-        serial_printf("[OK] File %s berhasil dibaca (%d bytes)\n", file->name, bytes_read);
-    }
-    //draw_text_from_psf("/UnOS/font/Lat15-VGA16.psf", 10, 10, "Hello world", 0xFFFFFFFF);
+    InitPSFFontGraphic();
+    PreparingGlobalPSFFont();
+    DrawSimplePSFText("UnOS Kernel (C) 2025 ConoCS", 10, 10, 0xFFFFFFFF);
+    DrawSimplePSFText("GPLv3 Licensed", 10, 30, 0xFFFFFFFF);
+    DrawSimplePSFText("Kernel started", 10, 50, 0xFFFFFFFF);
     
-
     init_terminal();
 
     while(1) {

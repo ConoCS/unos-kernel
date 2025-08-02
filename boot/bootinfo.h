@@ -4,10 +4,10 @@
 
 typedef struct {
     void *ACPIBGRT;
-    void *ACPIMADT;
     void *ACPIFADT;
-    void* ACPIHPET;
-}   ACPI_BOOT_INFO;
+    void *ACPIMADT;
+    void *ACPIHPET;
+}   __attribute__((packed)) ACPI_BOOT_INFO;
 
 typedef struct {
     void *gop;
@@ -16,7 +16,7 @@ typedef struct {
     uint32_t gop_width;
     uint32_t gop_pitch;
     uint32_t gop_height;
-}   GOP_BOOT_INFO;
+}   __attribute__((packed)) GOP_BOOT_INFO;
 
 typedef struct {
     GOP_BOOT_INFO *GopBootInform;
@@ -25,4 +25,4 @@ typedef struct {
     uint64_t MemoryMapSize;
     uint64_t MemoryMapDescriptorSize;
     uint64_t TotalAllRam;
-}   BOOT_INFO;
+}  __attribute__((packed)) BOOT_INFO;

@@ -37,7 +37,9 @@ C_SRC = \
 	$(SRC_DIR)/terminal/command/parsefat32.c \
 	$(SRC_DIR)/string/string.c \
 	$(SRC_DIR)/filesystem/vfs.c \
-	$(SRC_DIR)/file/extension/psf.c
+	$(SRC_DIR)/file/extension/psf.c \
+	$(SRC_DIR)/acpi/madt.c \
+	$(SRC_DIR)/acpi/acpi.c
 
 ASM_SRC = \
 	$(SRC_DIR)/boot/boot.asm \
