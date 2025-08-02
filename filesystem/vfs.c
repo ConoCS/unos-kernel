@@ -46,7 +46,7 @@ void VFSMountFAT32Root(HBA_PORT *port, VFSNode *mount_point) {
 
 uint32_t fat32_next_cluster(HBA_PORT *port, uint32_t cluster) {
     // 1. Hitung byte-offset dan sektor FAT untuk entri ini
-    serial_printf("Checkpoint 10A <- fat32_next_cluster entry\n");
+    //serial_printf("Checkpoint 10A <- fat32_next_cluster entry\n");
     uint64_t byte_off = (uint64_t)cluster * 4;
     uint32_t bps      = Fat32Info.boot_sector.bytes_per_sector;
     uint32_t fat_sect = Fat32Info.fat_start_sector + (byte_off / bps);
@@ -57,14 +57,14 @@ uint32_t fat32_next_cluster(HBA_PORT *port, uint32_t cluster) {
     // 2. Baca sektor FAT ke buffer DMA
     uintptr_t phys2;
     void *virt2 = palloc_aligned_DMA(bps, PAGE_SIZE, &phys2);
-    serial_printf("Checkpoint 10BA kode udah diganti\n");
+    //serial_printf("Checkpoint 10BA kode udah diganti\n");
     if(!ahci_read(port, fat_sect, 1, (void*)phys2)) {
         serial_printf("[E] FAT next-cluster read fail @ sector %u\n", fat_sect);
         pfree_aligned_DMA(virt2, bps);
-        serial_printf("Checkpoint 10B <- fat32_next_cluster exit\n");
+        //serial_printf("Checkpoint 10B <- fat32_next_cluster exit\n");
         return FAT32_EOC;
     }
-    serial_printf("Checkpoint 10C\n");
+    //serial_printf("Checkpoint 10C\n");
 
     // 3. Ambil 32-bit little endian, mask 28-bit
     uint32_t raw = ((uint32_t*)virt2)[off_in/4] & 0x0FFFFFFF;
@@ -74,13 +74,15 @@ uint32_t fat32_next_cluster(HBA_PORT *port, uint32_t cluster) {
         return FAT32_EOC;
     }
     if (raw < 2 || raw >= FAT32_EOC) {
-        serial_printf("[Error] Out-of-range FAT entry: %u\n", raw);
+        //serial_printf("[Error] Out-of-range FAT entry: %u\n", raw);
         pfree_aligned_DMA(virt2, bps);
         return FAT32_EOC;
     }
 
     serial_printf("[DEBUG] FAT Entry Raw: %u\n", raw);
-    serial_printf("Checkpoint 10D\n");
+    serial_printf("[TRACE] Reading Cluster %d, buf virt=0x%x, phys=0x%x\n", cluster, virt2, phys2);
+
+    //serial_printf("Checkpoint 10D\n");
     pfree_aligned_DMA(virt2, bps);
     return raw;
 }
@@ -238,6 +240,12 @@ VFSNode* Fat32Lookup(VFSNode *dir, const char *name) {
             if(strcasecmp(candidate, name) == 0) {
                 //serial_printf("Checkpoint 6A <- Masuk CMP\n");
                 VFSNode *node = kmalloc(sizeof(VFSNode));
+                if(!node) {
+                    serial_printf("[Error] Fat32Lookup: kmalloc failed\n");
+                    pfree_aligned_DMA(virt, buf_size);
+                    return NULL;
+                }
+                serial_printf("Pointer kmalloc node Lookup: %p\n", node);
                 memset(node, 0, sizeof(VFSNode));
                 //serial_printf("Checkpoint 6B\n");
                 strcpy(node->name, candidate);
@@ -314,6 +322,8 @@ int Fat32Read(VFSNode *node, size_t offset, void* buffer, size_t size) {
     #define MAX_CLUSTERS_CHAIN 4096
     int chain_count= 0;
 
+    serial_printf("[ENTER] cluster=%u, remaining=%u\n", cluster, remaining);
+
     while(remaining > 0 && cluster < FAT32_EOC) {
         if (++chain_count > MAX_CLUSTERS_CHAIN) {
             serial_printf("[Error] Fat32Read: Too many clusters\n");
@@ -331,27 +341,26 @@ int Fat32Read(VFSNode *node, size_t offset, void* buffer, size_t size) {
         uintptr_t phys;
         void *dma_buf = palloc_aligned_DMA(spc * bps, PAGE_SIZE, &phys);
         if (dma_buf) {
-            map_virtual((uint64_t)dma_buf, phys, PAGE_SIZE);
         }
-        serial_printf(" Checkpoint custom AC\n");
+        //serial_printf(" Checkpoint custom AC\n");
        if (!dma_buf) {
             serial_printf("[ERROR] DMA alloc fail for cluster %u\n", cluster);
             break;
         }
-        serial_printf(" Checkpoint custom AB\n");
+        //serial_printf(" Checkpoint custom AB\n");
         if(!ahci_read(node->fs_data, sector, spc, (void*)phys)) {
             serial_printf("[Error] Fat32Read: Failed read cluster %u (sector %llu)\n", cluster, sector);
             pfree_aligned_DMA(dma_buf, spc * bps);
             break;
         }
-        serial_printf(" Checkpoint custom AA\n");
+        //serial_printf(" Checkpoint custom AA\n");
 
 
-        serial_printf("[MEMCPY DBG] total_read=%llu, remaining=%llu\n", total_read, remaining);
-        serial_printf("  -> user_buf = %p\n", user_buf);
-        serial_printf("  -> dst = %p\n", user_buf + total_read);
-        serial_printf("  -> dma_buf = %p (phys=0x%llx)\n", dma_buf, phys);
-        serial_printf("  -> read_offset=%zu, read_len=%zu\n", read_offset, read_len);
+        //serial_printf("[MEMCPY DBG] total_read=%llu, remaining=%llu\n", total_read, remaining);
+        //serial_printf("  -> user_buf = %p\n", user_buf);
+        //serial_printf("  -> dst = %p\n", user_buf + total_read);
+        //serial_printf("  -> dma_buf = %p (phys=0x%llx)\n", dma_buf, phys);
+        //serial_printf("  -> read_offset=%zu, read_len=%zu\n", read_offset, read_len);
         memcpy(user_buf + total_read, (uint8_t*)dma_buf + read_offset, read_len);
 
         pfree_aligned_DMA(dma_buf, spc * bps);
@@ -362,10 +371,12 @@ int Fat32Read(VFSNode *node, size_t offset, void* buffer, size_t size) {
 
         uint32_t prev_cluster = cluster;
 
+        serial_printf("[LOOP] done cluster %u → total_read=%u, remaining=%u\n",
+              cluster, total_read, remaining);
         cluster = fat32_next_cluster((HBA_PORT*)node->fs_data, cluster);
 
-        serial_printf("[CLUSTER DEBUG] prev=%u -> next=%u, total_read=%u bytes, remaining=%u bytes\n",
-                    prev_cluster, cluster, total_read, remaining);
+        //serial_printf("[CLUSTER DEBUG] prev=%u -> next=%u, total_read=%u bytes, remaining=%u bytes\n",
+                    //prev_cluster, cluster, total_read, remaining);
 
         if (cluster < 2 || cluster >= FAT32_EOC)
             break;

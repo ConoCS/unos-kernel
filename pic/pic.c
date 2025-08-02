@@ -24,43 +24,32 @@ static inline uint8_t inb(uint16_t port) {
 
 void remap_pic() {
     serial_print("Begin PIC REMAP\n\n");
-    outb(PIC1_DATA, 0xFF);
-    outb(PIC2_DATA, 0xFF);
-    serial_print("Successfully saving last mask\n");
 
-    // Mulai inisialisasi
+    // Save mask
+    uint8_t a1 = inb(PIC1_DATA);
+    uint8_t a2 = inb(PIC2_DATA);
+
+    // Start init
     outb(PIC1_COMMAND, ICW1_INIT | ICW1_ICW4);
     outb(PIC2_COMMAND, ICW1_INIT | ICW1_ICW4);
-    serial_print("Start initializing PIC...\n");
 
-    // Setting vector offset
-    outb(PIC1_DATA, 0x20);
-    outb(PIC2_DATA, 0x28);
-    serial_print("Setting vector offset...\n");
+    outb(PIC1_DATA, 0x20); // Master offset
+    outb(PIC2_DATA, 0x28); // Slave offset
 
-    // Setup chaining
-    outb(PIC1_DATA, 0x04);
-    outb(PIC2_DATA, 0x02);
-    serial_print("Setup chaining...\n");
+    outb(PIC1_DATA, 0x04); // Tell Master about Slave at IRQ2
+    outb(PIC2_DATA, 0x02); // Tell Slave its cascade identity
 
-    // Mode 8086
     outb(PIC1_DATA, ICW4_8086);
     outb(PIC2_DATA, ICW4_8086);
-    serial_print("Setup 8086 mode...\n");
 
-    // Pulihkan Mask
-    outb(PIC1_DATA, 0xFE);
-    outb(PIC2_DATA, 0xFF);
-    serial_print("Restoring last mask that saved...\n");
-    
-    // Unmask IRQ0 (Timer)
-    outb(PIC1_DATA, inb(PIC1_DATA) & ~0x01);  // Bit 0 = IRQ0
-    serial_print("UnMasking IRQ0...\n");
+    // Restore mask, tapi unmask IRQ0 dan IRQ1
+    a1 &= ~(1 << 0); // Unmask IRQ0
+    a1 &= ~(1 << 1); // Unmask IRQ1
+    outb(PIC1_DATA, a1);
+    outb(PIC2_DATA, a2);
 
-    // Unmask IRQ1 (Keyboard)
-    outb(PIC1_DATA, inb(PIC1_DATA) & ~(1 << 1)); 
-    serial_print("UnMasking IRQ1...\n");
-
+    // Delay ~ few µs
+    for (volatile int i = 0; i < 1000; i++);
 
     serial_print("PIC Remap has done. Status: OK\n");
 }

@@ -55,6 +55,8 @@ char ascii_translator(uint8_t scancode) {
 
 void keyboard_handler(void* _) {
     uint8_t scancode = inb(0x60);
+    outb(0x20, 0x20); // EOI
+    outb(0xA0, 0x20); // EOI
     if (scancode & 0x80) {
         outb(0x20, 0x20);
         return;
@@ -62,8 +64,6 @@ void keyboard_handler(void* _) {
     //serial_print("Keyboard Scancode: 0x");
     //serial_print_hex((uint64_t)scancode);
     //serial_print("\n");
-
-    outb(0x20, 0x20); // EOI
 
     last_char = ascii_translator(scancode);
 }

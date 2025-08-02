@@ -189,7 +189,10 @@ int ahci_read(HBA_PORT *port, uint64_t start_lba, uint32_t sector_count, void *b
     /* 5. Tunggu sampai device siap */
     uint32_t spin = 0;
     const uint32_t TIMEOUT = 1000000;
-    while((port->tfd & 0x80) && spin++ < TIMEOUT);
+    serial_printf("Waiting for BSY to clear...\n");
+    while((port->tfd & 0x80) && spin++ < TIMEOUT) {
+    }
+    serial_printf("Done waiting. Took %d loops\n", spin);
     if (spin >= TIMEOUT) {
         serial_printf("[Error] AHCI_READ: Timeout waiting for device ready\n");
         return 0;
@@ -208,6 +211,6 @@ int ahci_read(HBA_PORT *port, uint64_t start_lba, uint32_t sector_count, void *b
     if(port->is & (1 << 30)) return 0;
     port->is = (uint32_t)-1;
 
-    serial_printf("AHCI_READ: Read LBA %llu (%u sectors) done\n", start_lba, sector_count);
+    //serial_printf("AHCI_READ: Read LBA %llu (%u sectors) done\n", start_lba, sector_count);
     return 1; // berhasil
 }
