@@ -6,11 +6,16 @@
 
 #define PHYS_HEAP_START 0x1000000
 #define MAX_TRACKED_PAGES 8192 // misalnya 32MB / 4KB
+#define DMA_VIRT_SIZE (512 * 1024 * 1024ULL) //512MB;
+static const uint64_t dma_virt_base = KERNEL_DMA_VIRT_BASE;
+static const uint64_t dma_virt_end  = dma_virt_base + DMA_VIRT_SIZE;
+static uint64_t dma_heap_curr = dma_virt_base;
 
 typedef unsigned long size_t;
 
 uint64_t heap_curr = KERNEL_HEAP_START;
 uint8_t page_bitmap[MAX_TRACKED_PAGES];
+uint8_t dma_bitmap[DMA_MAX_PAGES] = {0};
 uintptr_t base_phys_addr = 0x100000;
 extern uint64_t *kernel_pml4;
 
@@ -39,19 +44,42 @@ void *palloc_page() {
     return NULL;
 }
 
+void *dma_alloc_page() {
+    for (int i = 0; i < DMA_MAX_PAGES; i++) {
+        if (!dma_bitmap[i]) {
+            dma_bitmap[i] = 1;
+            return (void*)(DMA_BASE_ADDR + i * PAGE_SIZE);
+        }
+    }
+    return NULL;
+}
+
+
 void free_phys_page(void *addr) {
     uintptr_t phys = (uintptr_t)addr;
     if(phys < base_phys_addr) return;
 
     int index = (phys - base_phys_addr) / PAGE_SIZE;
-    if(index >= 0 && index < PAGE_SIZE) {
+    if(index >= 0 && index < MAX_TRACKED_PAGES) {
         page_bitmap[index] = 0;
     }
 }
 
+size_t align_up(size_t size, size_t align) {
+    if (align < 1) return size;
+    return (size + align - 1) & ~(align - 1);
+}
+
 void *kmalloc(size_t size) {
-    void *ptr = (void*)heap_curr;
-    heap_curr += size;
+    // 1. align heap_curr
+    uint64_t heap_curr_aligned = align_up(heap_curr, HEAP_ALIGN);
+    // 2. align size (opsional, tapi safer)
+    size = align_up(size, HEAP_ALIGN);
+
+    // 3. pakai alamat aligned sebagai ptr
+    void *ptr = (void*)heap_curr_aligned;
+    // 4. update heap_curr ke akhir block
+    heap_curr = heap_curr_aligned + size;
     return ptr;
 }
 
@@ -134,16 +162,20 @@ void *palloc_aligned(size_t size, size_t align) {
 void *palloc_aligned_DMA(size_t size, size_t align, uintptr_t *phys_out) {
     size_t map_size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
     
-    if (heap_curr & (PAGE_SIZE - 1)) {
-        heap_curr = (heap_curr + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+    if (dma_heap_curr & (PAGE_SIZE - 1)) {
+        dma_heap_curr= (dma_heap_curr + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
     }
 
-    void *virt = (void*)heap_curr;
-    heap_curr += map_size;
+    if(dma_heap_curr + map_size > dma_virt_end){
+        dma_heap_curr = dma_virt_base;
+    }
+
+    void *virt = (void*)dma_heap_curr;
+    dma_heap_curr += map_size;
 
     uintptr_t phys = 0;
     for(size_t offset = 0; offset < map_size; offset += PAGE_SIZE) {
-        void *page = palloc_page();
+        void *page = dma_alloc_page();
         if (!page) return NULL;
         if (offset == 0) phys = (uintptr_t)page;
         map_virtual((uint64_t)virt + offset, (uintptr_t)page, PAGE_SIZE);
@@ -167,7 +199,10 @@ void pfree_aligned_DMA(void *virt, size_t size) {
 
         unmap_page((void*)vaddr);
 
-        pmm_free((void*)phys);
+        int dma_index = (phys - DMA_BASE_ADDR) / PAGE_SIZE;
+        if (dma_index >= 0 && dma_index < DMA_MAX_PAGES) {
+            dma_bitmap[dma_index] = 0; 
+        }
     }
 }
 
