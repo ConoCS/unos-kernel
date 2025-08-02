@@ -5,9 +5,9 @@
 #include <stdint.h>
 #include "../Include/string.h"
 
-extern BOOT_INFO *bootInfo;
+GLOBAL BOOT_INFO *bootInfo;
 
-void init_acpi() {
+VOID init_acpi() {
     ACPI_MADT *Madt = (ACPI_MADT*)bootInfo->AcpiBootInform->ACPIMADT;
     if (Madt == NULL) {
         serial_print("ACPI MADT not found!\n");
@@ -18,7 +18,7 @@ void init_acpi() {
         serial_print("Invalid MADT Signature!\n");
     }
     serial_print("ACPI MADT found!\n");
-    char sig[5];
+    CHARA8 sig[5];
     memcpy(sig, &Madt->Header.Signature, 4);
     sig[4] = '\0';
     serial_printf("MADT Signature: %s\n", sig);
@@ -28,7 +28,7 @@ void init_acpi() {
     UEFIParseMADT(Madt);
 }
 
-void apic_send_eoi() {
+VOID apic_send_eoi() {
     volatile uint32_t* lapic_eoi = (uint32_t*)(0xFEE000B0);
     *lapic_eoi = 0;
 }

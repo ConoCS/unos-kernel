@@ -1,8 +1,6 @@
 #ifndef KERNEL_STRING_H
 #define KERNEL_STRING_H
 
-#define NULL ((void *)0)
-
 typedef unsigned long size_t;
 
 int strcmp(const char *s1, const char *s2);

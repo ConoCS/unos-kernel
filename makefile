@@ -2,7 +2,9 @@
 CC      = x86_64-elf-gcc
 AS      = nasm
 LD      = x86_64-elf-ld
-CFLAGS  = -ffreestanding -m64 -O0 -Wall -Wextra -mno-sse -mgeneral-regs-only -mno-mmx -mno-avx
+CFLAGS  = -ffreestanding -m64 -O0 -Wall -Wextra \
+          -mno-sse -mgeneral-regs-only -mno-mmx -mno-avx \
+          -I./Include
 LDFLAGS = -T kernel.ld -nostdlib
 
 # === Folder Structure ===

@@ -6,15 +6,15 @@
 
 IOAPIC_INFO g_ioapic;
 ISO_INFO g_iso[MAX_ISO_ENTRIES];
-int g_iso_count = 0;
-uint32_t IoAPICAddress = 0;
+INT g_iso_count = 0;
+USINT32 IoAPICAddress = 0;
 
-void UEFIParseMADT(ACPI_MADT *Madt) {
-    uint32_t lapic_addr = Madt->LocalApicAddress;
+VOID UEFIParseMADT(IN ACPI_MADT *Madt) {
+    USINT32 lapic_addr = Madt->LocalApicAddress;
     serial_printf("Local APIC Address: 0x%X\n", lapic_addr);
 
-    uint8_t *entry = Madt->Entries;
-    uint8_t *end = ((uint8_t*)Madt) + Madt->Header.Length;
+    USINT8 *entry = Madt->Entries;
+    USINT8 *end = ((USINT8*)Madt) + Madt->Header.Length;
     
     while(entry < end) {
         MADT_ENTRY_HEADER *hdr = (MADT_ENTRY_HEADER*)entry;
@@ -49,7 +49,7 @@ void UEFIParseMADT(ACPI_MADT *Madt) {
                 IoAPICAddress = g_ioapic.ioapic_addr;   
                 serial_printf("RAW IOAPIC ENTRY: ");
                 for (int i = 0; i < ioapic->Header.Length; i++) {
-                    serial_printf("%X ", *((uint8_t*)ioapic + i));
+                    serial_printf("%X ", *((USINT8*)ioapic + i));
                 }
                 serial_printf("\n");
                 if (g_ioapic.ioapic_addr == 0xFEC00000 && g_ioapic.gsi_base != 0) {
@@ -82,7 +82,7 @@ void UEFIParseMADT(ACPI_MADT *Madt) {
     }
 }
 
-uint32_t UEFIFindGSIForIRQ(uint8_t irq) {
+USINT32 UEFIFindGSIForIRQ(USINT8 irq) {
     for(int i = 0; i < g_iso_count; i++) {
         if(g_iso[i].irq_source == irq) {
             return g_iso[i].gsi;
@@ -91,23 +91,23 @@ uint32_t UEFIFindGSIForIRQ(uint8_t irq) {
     return irq;
 }
 
-uint32_t UEFIIOAPICRead(uint32_t reg) {
+USINT32 UEFIIOAPICRead(USINT32 reg) {
     IOAPIC_REGSEL(g_ioapic.ioapic_addr) = reg;
     return IOAPIC_IOWIN(g_ioapic.ioapic_addr);
 }
 
-void IOAPICWrite(uint32_t reg, uint32_t value) {
+VOID IOAPICWrite(USINT32 reg, USINT32 value) {
     IOAPIC_REGSEL(g_ioapic.ioapic_addr) = reg;
     IOAPIC_IOWIN(g_ioapic.ioapic_addr) = value;
 }
 
-void IOAPICRedirectIRQ(uint8_t irq, uint8_t vector, uint8_t lapic_id) {
-    uint32_t gsi = UEFIFindGSIForIRQ(irq);
-    uint32_t index = gsi * 2;
+VOID IOAPICRedirectIRQ(USINT8 irq, USINT8 vector, USINT8 lapic_id) {
+    USINT32 gsi = UEFIFindGSIForIRQ(irq);
+    USINT32 index = gsi * 2;
 
     IOAPICWrite(0x10 + index + 1, lapic_id << 24);
 
-    uint32_t low = 0;
+    USINT32 low = 0;
     low |= vector;
     low &= ~(1 << 16);
     low |= (0 << 11);
@@ -117,7 +117,7 @@ void IOAPICRedirectIRQ(uint8_t irq, uint8_t vector, uint8_t lapic_id) {
     IOAPICWrite(0x10 + index, low);
 }
 
-void InitIOAPIC(){
+VOID InitIOAPIC(){
     serial_printf("Initializing IOAPIC...\n");
     IOAPICRedirectIRQ(0, 0x20, 0);
     IOAPICRedirectIRQ(1, 0x21, 0);

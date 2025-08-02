@@ -1,21 +1,4 @@
-#include "idt/idt.h"
-#include "boot/bootinfo.h"
-#include "Include/paging.h"
-#include "Include/graphic.h"
-#include "Include/scheduler.h"
-#include "shceduler/tasklist.h"
-#include "pic/pic.h"
-#include "timer/pit.h"
-#include "terminal/terminal.h"
-#include "Include/string.h"
-#include "driver/pci/pci.h"
-#include "driver/storage.h"
-#include "driver/storage/gpt.h"
-#include "driver/storage/fat32.h"
-#include "filesystem/vfs.h"
-#include "file/extension/psf.h"
-#include "acpi/madt.h"
-#include "acpi/acpi.h"
+#include <unoskrnl.h>
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -24,11 +7,11 @@
 
 /* START COM SERIAL PRINT OUTPUT */
 
-static inline void outb(uint16_t port, uint8_t val) {
+SINLINE VOID outb(uint16_t port, uint8_t val) {
     asm volatile ("outb %0, %1" : : "a"(val), "Nd"(port));
 }
 
-static inline uint8_t inb(uint16_t port) {
+SINLINE USINT8 inb(uint16_t port) {
     uint8_t ret;
     asm volatile("inb %1, %0" 
             : "=a"(ret)
@@ -36,7 +19,7 @@ static inline uint8_t inb(uint16_t port) {
     return ret;
 }
 
-void init_serial() {
+VOID init_serial() {
     outb(COM1 + 1, 0x00); // disable interrupt
     outb(COM1 + 3, 0x80); // aktifkan DLAB
     outb(COM1 + 0, 0x03); // set divisor to 3 (lo byte) 38400 baud
@@ -46,29 +29,29 @@ void init_serial() {
     outb(COM1 + 4, 0x0B); // IRQs Enabled
 }
 
-int is_transit_empty() {
+INT is_transit_empty() {
     return inb(COM1 + 5) & 0x20;
 }
 
-void serial_write_char (char a) {
+VOID serial_write_char (char a) {
     while(is_transit_empty() == 0); 
     outb(COM1, a);
     
 }
 
-void serial_print(const char *str) {
+VOID serial_print(const char *str) {
     while(*str) {
         if(*str == '\n') serial_write_char('\r');
         serial_write_char(*str++);
     }
 }
 
-void serial_print_hex(uint64_t value) {
-    char hex[] = "0123456789ABCDEF";
-    char buffer[17];
+VOID serial_print_hex(uint64_t value) {
+    CHARA8 hex[] = "0123456789ABCDEF";
+    CHARA8 buffer[17];
     buffer[16] = '\0'; 
 
-    for (int i = 15; i >= 0; i--) {
+    for (INT i = 15; i >= 0; i--) {
         buffer[i] = hex[value & 0xF];
         value >>= 4;
     }
@@ -77,14 +60,14 @@ void serial_print_hex(uint64_t value) {
     serial_print(buffer);
 }
 
-void serial_printf(const char *fmt, ...) {
+VOID serial_printf(const char *fmt, ...) {
     va_list args;
     va_start (args, fmt);
 
     while(*fmt) {
         if(*fmt == '%') {
             fmt++;
-            char buf[32];
+            CHARA8 buf[32];
             switch (*fmt) {
                 case 's':
                     serial_print(va_arg(args, const char*));
@@ -112,7 +95,7 @@ void serial_printf(const char *fmt, ...) {
                     serial_print(buf);
                     break;
                 case 'p':
-                    void *ptr = va_arg(args, void*);
+                    VOID *ptr = va_arg(args, VPTR);
                     serial_print("0x");
                     xtoa((uint64_t)(uintptr_t)ptr, buf, 0);
                     serial_print(buf);
@@ -156,11 +139,11 @@ void serial_printf(const char *fmt, ...) {
  BOOT_INFO *bootInfo;
 
 
-void TryAhciRead(HBA_PORT *port, uint64_t start_lba, uint32_t sector_count) {
+VOID TryAhciRead(HBA_PORT *port, uint64_t start_lba, uint32_t sector_count) {
     uintptr_t phys;
-    void *virt = palloc_aligned_DMA(sector_count * 512, PAGE_SIZE, &phys);
+    VOID *virt = palloc_aligned_DMA(sector_count * 512, PAGE_SIZE, &phys);
 
-    int ok = ahci_read(port, start_lba, sector_count, (void*)phys);
+    int ok = ahci_read(port, start_lba, sector_count, (VPTR*)phys);
     if(ok == 1) serial_print("AHCI_READ OK\n");
 
     /* PRINT DATA */
@@ -174,7 +157,7 @@ void TryAhciRead(HBA_PORT *port, uint64_t start_lba, uint32_t sector_count) {
     serial_printf("\n");
 }
 
-void KernelPreSetup(BOOT_INFO *Info) {
+VOID KernelPreSetup(BOOT_INFO *Info) {
     remap_pic();
     init_idt(); /*SETUP IDT*/
     init_pit(100);
@@ -190,7 +173,7 @@ void KernelPreSetup(BOOT_INFO *Info) {
 } 
 
 __attribute__((noreturn))
-void KernelMain(BOOT_INFO *BootInfoArg) {
+VOID KernelMain(BOOT_INFO *BootInfoArg) {
     __asm__ volatile("cli");
     init_serial();
     serial_print("UnOS Kernel (C) 2025 ConoCS | GPLv3 Licensed\n\n");
