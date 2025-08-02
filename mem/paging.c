@@ -2,6 +2,8 @@
 #include "../boot/bootinfo.h"
 #include "../Include/com.h"
 #include "../driver/storage.h"
+#include "../acpi/madt.h"
+#include "../acpi/acpi.h"
 #include <stdint.h>
 
 #define KERNEL_HEAP_START 0xFFFF800000000000 
@@ -167,6 +169,20 @@ void init_paging(BOOT_INFO *bootInfo) {
     // Mapping alamat AHCI PCI agar bisa dipake buat DMA
     map_identity(AHCI_BASE, 0x200000); // AHCI_BASE
     map_identity(abar_global, 0x200000);  // ABAR_BASE
+
+    // — map region ACPI/MADT secara tepat —
+    uint64_t madt_phys = (uint64_t)bootInfo->AcpiBootInform->ACPIMADT;
+    ACPI_MADT *madt_hdr = (ACPI_MADT *)madt_phys;
+    uint32_t madt_len  = madt_hdr->Header.Length;
+
+    // page-align: start turun ke boundary 4 KiB, end naik ke boundary 4 KiB
+    uint64_t map_start = madt_phys & ~0xFFFULL;
+    uint64_t map_end   = ( (madt_phys + madt_len + 0xFFFULL) & ~0xFFFULL );
+    uint64_t map_size  = map_end - map_start;
+
+    map_identity(map_start, map_size);
+    serial_printf("Mapped MADT @0x%lX (+%u bytes) → pages [0x%lX–0x%lX)\n",
+                  map_start, madt_len, map_start, map_end);
 
     // Activate paging
     load_pml4(pml4_table);

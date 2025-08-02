@@ -14,6 +14,10 @@ typedef unsigned long size_t;
 #define PAGE_PRESENT 0x1 // Bit 0: Page aktif (1 = ada di RAM, 0 = akan trigger page fault)
 #define PAGE_WRITABLE 0x2  // Bit 1: 1 = bisa ditulis, 0 = hanya bisa dibaca (read-only)
 #define PAGE_LARGE 0x80 // Bit 7: 1 = page ini adalah huge page (2MB atau 1GB, tergantung level-nya)
+#define HEAP_ALIGN 8 // atau 16 kalau mau aman untuk 64-bit
+#define DMA_BASE_ADDR 0x8000000   // 16MB
+#define DMA_MAX_PAGES 512        // misalnya 2MB DMA pool (512 x 4096)
+#define KERNEL_DMA_VIRT_BASE  0xFFFF900000000000
 
 void map_identity(uint64_t physc_addr, uint64_t size);
 void map_virtual(uint64_t virtual_addr, uint64_t phys_addr, uint64_t size);
