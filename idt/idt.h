@@ -20,6 +20,7 @@ typedef struct {
 } registers_t;
 
 uint64_t gettick_handler();
+void delay(int ms);
 
 extern volatile uint32_t minute;
 extern volatile uint8_t second;

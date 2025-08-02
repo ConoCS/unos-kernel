@@ -167,7 +167,6 @@ isr32:
 isr33:
     ; Push interrupt stack frame secara manual
     cld
-    push qword 0     ; error code dummy (jika tidak ada)
     push r15
     push r14
     push r13
@@ -203,7 +202,6 @@ isr33:
     pop r13
     pop r14
     pop r15
-    add rsp, 8                ; buang dummy error code
 
     iretq
 
