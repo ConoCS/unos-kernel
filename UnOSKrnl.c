@@ -185,6 +185,8 @@ void KernelPreSetup(BOOT_INFO *Info) {
     acpiInfo = Info->AcpiBootInform;
     init_phys_allocator();
     init_acpi();
+    disable_pic();
+    InitIOAPIC();
 } 
 
 __attribute__((noreturn))
@@ -201,7 +203,6 @@ void KernelMain(BOOT_INFO *BootInfoArg) {
     __asm__ volatile("sti");
     connect_to_framebuffer();
     drawfullscreen(0x000000FF);
-    delay(3000);
 
     ParseGPT(ahci_port);
     //ParseFAT32(ahci_port);

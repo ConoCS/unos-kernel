@@ -27,3 +27,8 @@ void init_acpi() {
     serial_printf("MADT Flags: 0x%X\n", Madt->Flags);
     UEFIParseMADT(Madt);
 }
+
+void apic_send_eoi() {
+    volatile uint32_t* lapic_eoi = (uint32_t*)(0xFEE000B0);
+    *lapic_eoi = 0;
+}

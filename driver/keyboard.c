@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include "../Include/com.h"
 #include "../pic/pic.h"
+#include "../acpi/acpi.h"
 #include "keyboard.h"
 
 #define KBD_DATA_PORT 0x60
@@ -55,10 +56,9 @@ char ascii_translator(uint8_t scancode) {
 
 void keyboard_handler(void* _) {
     uint8_t scancode = inb(0x60);
-    outb(0x20, 0x20); // EOI
-    outb(0xA0, 0x20); // EOI
+    apic_send_eoi(); // Kirim EOI ke PIC
     if (scancode & 0x80) {
-        outb(0x20, 0x20);
+        apic_send_eoi();
         return;
     }
     //serial_print("Keyboard Scancode: 0x");

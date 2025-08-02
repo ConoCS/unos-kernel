@@ -2,7 +2,6 @@
 #define ACPI_H
 
 #include <stdint.h>
-#include "madt.h"
 
 #define ACPI_MADT_SIGNATURE  0x43495041  // 'APIC' dalam little-endian
 
@@ -19,6 +18,10 @@ typedef struct {
     uint32_t CreatorRevision;  // Versi dari tool pembuatnya
 } __attribute__((packed)) ACPI_HEADER;
 
+extern uint32_t IoAPICAddress;
+
 void init_acpi();
+void apic_send_eoi();
+
 
 #endif // ACPI_H

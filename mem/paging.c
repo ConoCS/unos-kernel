@@ -181,8 +181,13 @@ void init_paging(BOOT_INFO *bootInfo) {
     uint64_t map_size  = map_end - map_start;
 
     map_identity(map_start, map_size);
-    serial_printf("Mapped MADT @0x%lX (+%u bytes) → pages [0x%lX–0x%lX)\n",
+    serial_printf("Mapped MADT %X (+%u bytes) → pages [0x%lX–0x%lX)\n",
                   map_start, madt_len, map_start, map_end);
+    map_identity((uint64_t)IoAPICAddress, 0x1000);
+    serial_printf("Mapped IOAPIC address at %x\n", IoAPICAddress);
+    map_identity(0xFEC00000, 0x1000);
+    map_identity(0xFEE00000, 0x1000);
+    map_identity(0xFEC000, 0x1000);
 
     // Activate paging
     load_pml4(pml4_table);

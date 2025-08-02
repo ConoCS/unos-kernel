@@ -3,6 +3,7 @@
 #include "errornumber/errnum.h"
 #include "../Include/com.h"
 #include "../Include/graphic.h"
+#include "../acpi/acpi.h"
 
 
 /* FUNGSI PANIC BISA DIPANGGIL SEBAGAI BERIKUT 
@@ -87,11 +88,7 @@ void isr14_handler_c(uint64_t error_code) {
 volatile uint64_t tick = 0;
 
 void irq_handler_c(registers_t *regs, uint64_t irq_number) {
-    // Kirim EOI ke PIC
-    if (irq_number >= 40) {
-        outb(0xA0, 0x20); // Slave PIC
-    }
-    outb(0x20, 0x20); // Master PIC
+    apic_send_eoi();
 
     tick++;
     if(tick % 100 == 0) {

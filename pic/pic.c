@@ -53,3 +53,10 @@ void remap_pic() {
 
     serial_print("PIC Remap has done. Status: OK\n");
 }
+
+void disable_pic() {
+    // Mask semua IRQ
+    outb(0x21, 0xFF); // Master PIC
+    outb(0xA1, 0xFF); // Slave PIC
+    serial_print("PIC disabled.\n");
+}

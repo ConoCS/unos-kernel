@@ -4,6 +4,11 @@
 #include <stdint.h>
 #include <stddef.h>
 
+IOAPIC_INFO g_ioapic;
+ISO_INFO g_iso[MAX_ISO_ENTRIES];
+int g_iso_count = 0;
+uint32_t IoAPICAddress = 0;
+
 void UEFIParseMADT(ACPI_MADT *Madt) {
     uint32_t lapic_addr = Madt->LocalApicAddress;
     serial_printf("Local APIC Address: 0x%X\n", lapic_addr);
@@ -38,6 +43,19 @@ void UEFIParseMADT(ACPI_MADT *Madt) {
                 serial_printf("IOAPIC: IoApicId=%d, IoApicAddress=0x%X, GlobalSystemInterruptBase=%d\n",
                               ioapic->IoApicId, ioapic->IoApicAddress, ioapic->GlobalSystemInterruptBase);
                 serial_printf("Type=%u, Length=%u\n", hdr->Type, hdr->Length);
+                g_ioapic.ioapic_id = ioapic->IoApicId;
+                g_ioapic.ioapic_addr = ioapic->IoApicAddress;
+                g_ioapic.gsi_base = ioapic->GlobalSystemInterruptBase;
+                IoAPICAddress = g_ioapic.ioapic_addr;   
+                serial_printf("RAW IOAPIC ENTRY: ");
+                for (int i = 0; i < ioapic->Header.Length; i++) {
+                    serial_printf("%X ", *((uint8_t*)ioapic + i));
+                }
+                serial_printf("\n");
+                if (g_ioapic.ioapic_addr == 0xFEC00000 && g_ioapic.gsi_base != 0) {
+                serial_printf("IOAPIC at 0xFEC00000 but GSI base is %u? Forcing to 0\n", g_ioapic.gsi_base);
+                g_ioapic.gsi_base = 0;
+            }
                 break;
             }
 
@@ -45,6 +63,15 @@ void UEFIParseMADT(ACPI_MADT *Madt) {
                 MADT_ISO *iso = (MADT_ISO*)entry;
                 serial_printf("ISO: BusSource=%d, IrqSource=%d, GlobalSystemInterrupt=%d, Flags=0x%X\n",
                               iso->BusSource, iso->IrqSource, iso->GlobalSystemInterrupt, iso->Flags);
+                if(g_iso_count < MAX_ISO_ENTRIES) {
+                    g_iso[g_iso_count].irq_source = iso->IrqSource;
+                    g_iso[g_iso_count].gsi = iso->GlobalSystemInterrupt;
+                    g_iso[g_iso_count].flags = iso->Flags;
+                    g_iso_count++;
+                    serial_printf("ISO Info[%d]: IrqSource=%d, GSI=%d, Flags=0x%X\n",
+                                  g_iso_count - 1, iso->IrqSource, iso->GlobalSystemInterrupt, iso->Flags); 
+
+                }
                 break;
             }
             default:
@@ -53,4 +80,46 @@ void UEFIParseMADT(ACPI_MADT *Madt) {
         }
         entry += hdr->Length;
     }
+}
+
+uint32_t UEFIFindGSIForIRQ(uint8_t irq) {
+    for(int i = 0; i < g_iso_count; i++) {
+        if(g_iso[i].irq_source == irq) {
+            return g_iso[i].gsi;
+        }
+    }
+    return irq;
+}
+
+uint32_t UEFIIOAPICRead(uint32_t reg) {
+    IOAPIC_REGSEL(g_ioapic.ioapic_addr) = reg;
+    return IOAPIC_IOWIN(g_ioapic.ioapic_addr);
+}
+
+void IOAPICWrite(uint32_t reg, uint32_t value) {
+    IOAPIC_REGSEL(g_ioapic.ioapic_addr) = reg;
+    IOAPIC_IOWIN(g_ioapic.ioapic_addr) = value;
+}
+
+void IOAPICRedirectIRQ(uint8_t irq, uint8_t vector, uint8_t lapic_id) {
+    uint32_t gsi = UEFIFindGSIForIRQ(irq);
+    uint32_t index = gsi * 2;
+
+    IOAPICWrite(0x10 + index + 1, lapic_id << 24);
+
+    uint32_t low = 0;
+    low |= vector;
+    low &= ~(1 << 16);
+    low |= (0 << 11);
+    low |= (0 << 13);
+    low |= (0 << 15);
+
+    IOAPICWrite(0x10 + index, low);
+}
+
+void InitIOAPIC(){
+    serial_printf("Initializing IOAPIC...\n");
+    IOAPICRedirectIRQ(0, 0x20, 0);
+    IOAPICRedirectIRQ(1, 0x21, 0);
+    serial_printf("IOAPIC initialized\n");
 }
