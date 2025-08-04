@@ -1,0 +1,27 @@
+{
+  "configurations": [
+    {
+      "name": "UnOS Kernel",
+      "includePath": [
+        "${workspaceFolder}/",
+        "${workspaceFolder}/Include"
+      ],
+      "defines": [
+        "_KERNEL_MODE"
+      ],
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "linux-gcc-x64",
+      "browse": {
+        "path": [
+          "${workspaceFolder}/",
+          "${workspaceFolder}/Include"
+        ],
+        "limitSymbolsToIncludedHeaders": true,
+        "databaseFilename": ""
+      }
+    }
+  ],
+  "version": 4
+}

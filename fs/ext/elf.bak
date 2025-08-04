@@ -1,0 +1,75 @@
+#include <unoskrnl.h>
+
+int LoadELF64(const char *path) {
+    VFSNode *file = Fat32Open(vfs_root, path);
+    if (!file || file->type != VFS_TYPE_FILE) {
+        serial_printf("[Error] LoadELF64: File not found or not a regular file\n");
+        return -1;
+    }
+
+    size_t elf_size;
+    void *elf_data = VFSReadFile(file, &elf_size);
+    if (!elf_data || elf_size < sizeof(Elf64_Ehdr)) {
+        serial_printf("[Error] LoadELF64: Failed to read ELF file or file too small\n");
+        return STATUS_FAIL;
+    }
+
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr*)elf_data;
+    if (ehdr->e_ident[0] != 0x7F || ehdr->e_ident[1] != 'E' ||
+        ehdr->e_ident[2] != 'L' || ehdr->e_ident[3] != 'F') {
+        return STATUS_INVALID;
+    }
+
+    Elf64_Phdr *phdr = (Elf64_Phdr*)((uint8_t*)elf_data + ehdr->e_phoff);
+
+    for (int i = 0; i < ehdr->e_phnum; i++) {
+        if (phdr[i].p_type != PT_LOAD) continue;
+
+        uint64_t vaddr = phdr[i].p_vaddr & ~0xFFF;
+        uint64_t memsz = phdr[i].p_memsz;
+        uint64_t filesz = phdr[i].p_filesz;
+        uint64_t offset = phdr[i].p_offset;
+
+        // Align down & up
+        uint64_t aligned_filesz = ((filesz + 0xFFF) & ~0xFFF);
+        uint64_t aligned_memsz = ((memsz + 0xFFF) & ~0xFFF);
+
+        for (uint64_t page_offset = 0; page_offset < aligned_memsz; page_offset += PAGE_SIZE) {
+            void *phys_page = palloc_page();
+            if (!phys_page) {
+                serial_printf("[LoadELF64] Failed to alloc physical page\n");
+                return STATUS_FAIL;
+            }
+
+            //map_page_user(vaddr + page_offset, (uint64_t)phys_page); // <- belom ada
+
+            // Hanya copy isi file ELF, bukan .bss
+            if (page_offset < filesz) {
+                uint64_t copy_size = PAGE_SIZE;
+                if (filesz - page_offset < PAGE_SIZE) copy_size = filesz - page_offset;
+
+                memcpy((void*)(vaddr + page_offset), (uint8_t*)elf_data + offset + page_offset, copy_size);
+            }
+
+            // Bersihkan sisa jika .bss
+            if (page_offset >= filesz || filesz - page_offset < PAGE_SIZE) {
+                uint64_t zero_start = (page_offset >= filesz) ? 0 : filesz - page_offset;
+                memset((void*)(vaddr + page_offset + zero_start), 0, PAGE_SIZE - zero_start);
+            }
+        }
+    }
+
+    // Alokasikan stack userland
+    void *stack_phys = palloc_page();
+    if (!stack_phys) {
+        serial_printf("[LoadELF64] Failed to alloc user stack page\n");
+        return STATUS_FAIL;
+    }
+
+    #define USER_STACK_TOP 0x7FFFFFFF000ULL
+    //map_page_user(USER_STACK_TOP - PAGE_SIZE, (uint64_t)stack_phys);
+
+    enter_userland((void*)ehdr->e_entry, USER_STACK_TOP);
+
+    return STATUS_OK;
+}

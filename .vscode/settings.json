@@ -1,0 +1,16 @@
+{
+    "files.associations": {
+        "gpt.h": "c",
+        "memory.h": "c",
+        "wdsoft.h": "c",
+        "fat32.h": "c",
+        "vfs.h": "c",
+        "spinlock.h": "c",
+        "psf.h": "c",
+        "graphic.h": "c",
+        "unoskrnl.h": "c",
+        "scheduler.h": "c",
+        "tasklist.h": "c",
+        "storage.h": "c"
+    }
+}
