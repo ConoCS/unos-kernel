@@ -34,6 +34,7 @@ all: $(KERNEL)
 $(KERNEL): $(OBJ)
 	@echo "== Linking kernel ELF =="
 	$(LD) -n -T $(LINKER_SCRIPT) -o $@ $^
+	@echo "== UnOSKrnl.elf successfully build =="
 
 # Rule for C source
 $(BUILD_DIR)/%.o: $(ROOT_DIR)/%.c
