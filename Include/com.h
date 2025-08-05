@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include <unostype.h>
 
 // ANSI color escape codes
 #define ANSI_COLOR_RESET   "\x1b[0m"
@@ -16,7 +17,7 @@
 #define ANSI_BOLD_ON       "\x1b[1m"
 #define ANSI_BOLD_OFF      "\x1b[22m"
 
-
+VOID init_serial();
 void serial_print(const char *str);
 void serial_print_hex(uint64_t value);
 void serial_write_char (char a);
