@@ -26,8 +26,6 @@ FUNCWITHSTATUS ShowBGRT(IN ACPI_BGRT *Bgrt) {
     INT32 Width = *(USINT32*)&BmpData[0x12];
     INT32 Height = *(USINT32*)&BmpData[0x16];
     USINT16 BitCount = *(USINT16*)&BmpData[0x1C];
-    USINT32 screen_x = Bgrt->ImageOffsetX;
-    USINT32 screen_y = Bgrt->ImageOffsetY;
 
     if(BitCount == 32) {
         serial_printf("[BGRT] 32-BIT\n");
@@ -41,10 +39,9 @@ FUNCWITHSTATUS ShowBGRT(IN ACPI_BGRT *Bgrt) {
 
     USINT32 Padding = (4 - (Width * (BitCount / 8)) % 4) % 4; // padding per row (BMP rows are aligned to 4 bytes)
 
-    for (USINT32 y = 0; y < Height; y++) {
+    for (INT32 y = 0; y < Height; y++) {
         USINT8 *row = Pixels + (Height - 1 - y) * (Width * 3 + Padding);
-        for(USINT32 x = 0; x < Width; x++) {
-            USINT32 offset = (x + Bgrt->ImageOffsetX) + (y + Bgrt->ImageOffsetY) * screen_pitch;
+        for(INT32 x = 0; x < Width; x++) {
 
             if((x + Bgrt->ImageOffsetX) >= screen_width || (y + Bgrt->ImageOffsetY) >= screen_height) {
                 continue;
@@ -78,5 +75,7 @@ FUNCWITHSTATUS ShowBGRT(IN ACPI_BGRT *Bgrt) {
         }
     }
     serial_printf("[BGRT] Done showing BGRT\n");
+
+    return STATUS_OK;
 
 }

@@ -16,9 +16,23 @@
 #define LAPIC_WAIT_VECTOR 0x31 // vector yang tidak dipakai
 #define TIMER_VECTOR 0x20
 #define SCALE_FACTOR 2  // misal interrupt 50×/detik → ≈100× skala
+#define MAX_CPU_COUNT 256
 
 #define LAPIC_SVR   0xF0
 #define LAPIC_EOI   0xB0
+
+#define APIC_BASE        0xFEE00000
+#define APIC_ICR_LOW     0x300   // Interrupt Command Register Low
+#define APIC_ICR_HIGH    0x310   // Interrupt Command Register High
+
+#define ICR_DELIVERY_MODE_FIXED     (0 << 8)
+#define ICR_DELIVERY_MODE_INIT      (5 << 8)
+#define ICR_DELIVERY_MODE_STARTUP   (6 << 8)
+#define ICR_LEVEL_ASSERT            (1 << 14)
+#define ICR_DEST_MODE_PHYSICAL      0
+#define ICR_DEST_SHORTHAND_NONE    (0 << 18)
+#define TRAMPOLINE_ADDR 0x7000
+
 
 typedef struct {
     ACPI_HEADER Header;
@@ -67,9 +81,19 @@ typedef struct {
     uint16_t flags;
 } ISO_INFO;
 
+typedef struct {
+    USINT8 processor_id;
+    USINT8 apic_id;
+    BOOL is_bsp; // true untuk core pertama
+    BOOL started;
+} CPU_CORE;
+
 GLOBAL IOAPIC_INFO g_ioapic;
 GLOBAL ISO_INFO g_iso[MAX_ISO_ENTRIES];
 GLOBAL int g_iso_count;
+GLOBAL CPU_CORE g_cpu_cores[MAX_CPU_COUNT];
+GLOBAL USINT32 g_cpu_count;
+
 
 VOID UEFIParseMADT(ACPI_MADT *Madt);
 VOID InitIOAPIC();

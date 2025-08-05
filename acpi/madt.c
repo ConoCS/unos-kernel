@@ -4,6 +4,85 @@ IOAPIC_INFO g_ioapic;
 ISO_INFO g_iso[MAX_ISO_ENTRIES];
 INT g_iso_count = 0;
 USINT32 IoAPICAddress = 0;
+CPU_CORE g_cpu_cores[MAX_CPU_COUNT];
+USINT32 g_cpu_count = 0;
+
+SINLINE VOID mmio_write(uint32_t reg, uint32_t val) {
+    volatile uint32_t *ptr = (volatile uint32_t *)(APIC_BASE + reg);
+    *ptr = val;
+}
+
+SINLINE VOID send_ipi(uint8_t apic_id, uint8_t vector) {
+    // Set destination APIC ID
+    mmio_write(APIC_ICR_HIGH, ((uint32_t)apic_id) << 24);
+
+    // Kirim IPI (Fixed delivery, assert level)
+    mmio_write(APIC_ICR_LOW,
+        vector |                  // Vector number
+        ICR_DELIVERY_MODE_FIXED | 
+        ICR_LEVEL_ASSERT |
+        ICR_DEST_MODE_PHYSICAL |
+        ICR_DEST_SHORTHAND_NONE
+    );
+    
+    // Tunggu sampai pengiriman selesai (bit 12 = delivery status)
+    while (*(volatile uint32_t *)(APIC_BASE + APIC_ICR_LOW) & (1 << 12)) {
+        __asm__ volatile ("pause");
+    }
+}
+
+SINLINE USINT64 read_msr(USINT32 msr_id) {
+    USINT32 low, high;
+    __asm__ volatile (
+        "rdmsr"
+        : "=a"(low), "=d"(high)
+        : "c"(msr_id)
+    );
+    return ((USINT64)high << 32) | low;
+}
+
+SINLINE USINT32 read_apic_id() {
+    USINT32 eax, ebx, ecx, edx;
+    eax = 1;
+    __asm__ volatile (
+        "cpuid"
+        : "+a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
+    );
+    return (ebx >> 24) & 0xFF; // APIC ID ada di bit 24-31 EBX
+}
+
+STATIC VOID mdelay(IN USINT32 ms) {
+    for (USINT32 i = 0; i < ms * 1000; i++) {
+        for (USINT32 j = 0; j < 1000; j++) {
+            __asm__ __volatile__("pause");
+        }
+    }
+}
+
+USINT32 get_bsp_apic_id() {
+    USINT64 apic_base = read_msr(0x1B);
+    return (read_apic_id());
+}
+
+VOID boot_aps() {
+    for(USINT32 i = 0; i < g_cpu_count; i++) {
+        if(!g_cpu_cores[i].is_bsp) {
+            USINT8 apic_id = g_cpu_cores[i].apic_id;
+            serial_printf("[Kernel] Wake AP (APIC ID: %u)", apic_id);
+
+            send_ipi(apic_id, 0x00000500); // INIT
+            mdelay(10);
+            send_ipi(apic_id, 0x00000600 | (TRAMPOLINE_ADDR >> 12)); // SIPI
+            mdelay(1);
+            send_ipi(apic_id, 0x00000600 | (TRAMPOLINE_ADDR >> 12)); // SIPI ulang
+            mdelay(1);
+
+            while(!g_cpu_cores[i].started) { 
+                asm volatile("hlt");
+            }
+        }
+    }
+}
 
 VOID UEFIParseMADT(ACPI_MADT *Madt) {
     USINT32 lapic_addr = Madt->LocalApicAddress;
@@ -29,6 +108,13 @@ VOID UEFIParseMADT(ACPI_MADT *Madt) {
         switch(hdr->Type) {
             case 0: {
                 MADT_LAPIC *lapic = (MADT_LAPIC*)entry;
+                if(lapic->Flags & 1) {
+                    if(g_cpu_count < MAX_CPU_COUNT) {
+                        g_cpu_cores[g_cpu_count].processor_id = lapic->ProcessorId;
+                        g_cpu_cores[g_cpu_count].apic_id = lapic->ApicId;
+                        g_cpu_cores[g_cpu_count].is_bsp = (lapic->ApicId == get_bsp_apic_id());
+                    }
+                }
                 serial_printf("LAPIC: ProcessorId=%d, ApicId=%d, Flags=0x%X\n",
                               lapic->ProcessorId, lapic->ApicId, lapic->Flags);
                 serial_printf("Type=%u, Length=%u\n", hdr->Type, hdr->Length);
