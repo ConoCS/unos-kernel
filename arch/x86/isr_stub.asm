@@ -251,28 +251,5 @@ isr_mouse:
 
     iretq
 
-syscall_handler_wrapper:
-; This is the syscall handler wrapper
-    ; Push interrupt stack frame secara manual
-    push rax
-    push rdi
-    push rsi
-    push rdx
-
-    ;SYSCALL CONVENTION:
-    ; SyscallHandler(rax, rdi, rsi, rdx)
-    mov rdi, [rsp + 24] ; rax
-    mov rsi, [rsp + 16] ; rdi
-    mov rdx, [rsp + 8] ; rsi
-    mov rcx, [rsp + 0] ; rdx
-
-    call SyscallHandler
-    pop rdx
-    pop rsi
-    pop rdi
-    pop rax
-
-    iretq
-
 
 
