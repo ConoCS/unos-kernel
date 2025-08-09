@@ -1,6 +1,7 @@
 #include <unoskrnl.h>
 
 char charbuffer[512];
+INT GraphicEnabled = 0;
 
 typedef void(*CommandFunc)(const char *arg);
 typedef struct {
@@ -25,7 +26,8 @@ void run_command(char *input) {
         {"PARSEFAT32", parsefat32},
         {"CD", cd},
         {"SHUTDOWN", Shutdown},
-        {"SLEEP", Sleep}
+        {"SLEEP", Sleep},
+        {"GRAPHIC", Graphic}
     };
 
     int num_commands = sizeof(commands) / sizeof(commands[0]);
@@ -38,9 +40,9 @@ void run_command(char *input) {
     }
 
     serial_print(command);
-        serial_print(" ");
-        serial_print(" Is not a valid command nor a valid operable program");
-        serial_print("\n");
+    serial_print(" ");
+    serial_print(" Is not a valid command nor a valid operable program");
+    serial_print("\n");
 }
 
 void terminal_queue_word() {
@@ -61,8 +63,6 @@ void terminal_queue_word() {
         } else {
             if (index < 511) {
                 charbuffer[index++] = c;
-
-                char out[2] = {c, '\0'};
             }
         }
     
