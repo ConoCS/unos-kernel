@@ -51,8 +51,6 @@
 
 // Userland
 #include "userland/userland.h"
-#include "userland/syshand/syshand.h"
-#include "userland/syshand/syscall.h"
 
 // Utilities
 #include <kstring.h>    // only the header, not .c!

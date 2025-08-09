@@ -5,6 +5,7 @@
 #define PSF1_MAGIC0 0x36
 #define PSF1_MAGIC1 0x04
 #define PSF2_MAGIC 0x864AB572
+#define defaultcolor 0xFFFFFFFF
 
 typedef enum {
     PSF_TYPE_NONE = 0,
@@ -39,9 +40,37 @@ typedef struct {
 } __attribute__((packed)) PSF1Header;
 
 extern void *system_font_psf;
+GLOBAL INT term_cursor_x;
+GLOBAL INT term_cursor_y;
+GLOBAL INT glyph_width, glyph_height, glyph_size;
+GLOBAL INT GraphicOK;
 
 void* load_psf_file(const char *path);
 PSFHeader *parse_psf(void *buffer);
-void DrawSimplePSFText(const char *text, int x, int y, uint32_t color);
+UNFUNCTION DrawSimplePSFText(IN CONST CHARA8 *text, IN USINT32 Color);
+UNFUNCTION
+PSFPrintf(
+    IN CONST CHARA8 *Text,
+    ...
+) ;
+
+UNFUNCTION
+PSFPutChar(
+    IN CHARA8 ch,
+    IN USINT32 Color
+);
+
+UNFUNCTION
+ResetCursorY(
+);
+
+UNFUNCTION
+ResetCursorX(
+);
+
+UNFUNCTION
+TerminalTTYScrollUp(
+    IN USINT32 Color_Background
+);
 
 #endif

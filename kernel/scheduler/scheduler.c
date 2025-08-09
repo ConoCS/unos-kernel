@@ -40,8 +40,7 @@ void dotask() {
         if (TaskPool[i].Task == 0) {
             serial_print("Task terminated... \n");
             break;
-        }
-
+        } 
         /* Kode normal buat jalanin task normal. Jika ada TASK_TERMINATED, ignore */
         if(CurrentTask->Task == TASK_TERMINATED) {
             continue;

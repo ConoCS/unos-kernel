@@ -4,18 +4,13 @@
 #define KERNEL_HEAP_START 0xFFFF800000000000 
 #define KERNEL_HEAP_SIZE (10 * 1024 * 1024)
 #define KERNEL_HEAP_PHYSC_START 0x00400000
+#define PAGE_SUPERVISOR 0x0       // U/S = 0
 
-extern void load_pml4(uint64_t *pml4);
 static uint64_t *pml4_table = (uint64_t*)0x1000;
-uint64_t *kernel_pml4;
+uint64_t *kernel_pml4 = NULL;
 
 #define PAGE_SIZE 0x1000
 #define PAGE_NOCACHE 0x10
-
-/* ALAMAT VIRTUAL KERNEL HEAP */
-#define KERNEL_HEAP_START 0xFFFF800000000000
-#define KERNEL_HEAP_SIZE (10 * 1024 * 1024)
-#define KERNEL_HEAP_PHYSICAL_START 0x00400000
 
 // Pointer awal memori kosong untuk alokasi page table baru
 static uint64_t *next_free_page = (uint64_t*)0x4000; // setelah 0x3000
@@ -38,7 +33,7 @@ void map_identity(uint64_t physc_addr, uint64_t size) {
         // Jika belum ada PDPT, alokasikan
         if (!(pml4_table[pml_index] & PAGE_PRESENT)) {
             uint64_t* new_pdpt = alloc_page();
-            pml4_table[pml_index] = (uint64_t)new_pdpt | PAGE_PRESENT | PAGE_WRITABLE;
+            pml4_table[pml_index] = (uint64_t)new_pdpt | PAGE_PRESENT | PAGE_WRITABLE | PAGE_SUPERVISOR;
         }
 
         uint64_t* pdpt = (uint64_t*)(pml4_table[pml_index] & 0x000FFFFFFFFFF000);
@@ -46,13 +41,13 @@ void map_identity(uint64_t physc_addr, uint64_t size) {
         // Jika belum ada PD, alokasikan
         if (!(pdpt[pdpt_index] & PAGE_PRESENT)) {
             uint64_t* new_pd = alloc_page();
-            pdpt[pdpt_index] = (uint64_t)new_pd | PAGE_PRESENT | PAGE_WRITABLE;
+            pdpt[pdpt_index] = (uint64_t)new_pd | PAGE_PRESENT | PAGE_WRITABLE | PAGE_SUPERVISOR;
         }
 
         uint64_t* pd = (uint64_t*)(pdpt[pdpt_index] & 0x000FFFFFFFFFF000);
 
         // Set mapping langsung (2MB page)
-        pd[pd_index] = (addr & 0xFFFFFFFFFFE00000) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_LARGE;
+        pd[pd_index] = (addr & 0xFFFFFFFFFFE00000) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_LARGE | PAGE_SUPERVISOR;
     }
 }
 
@@ -76,7 +71,9 @@ void map_framebuffer(uint64_t addr, uint64_t size) {
 
         uint64_t* pd = (uint64_t*)(pdpt[pdpt_index] & 0x000FFFFFFFFFF000);
 
-        pd[pd_index] = (a & 0xFFFFFFFFFFE00000) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_LARGE | PAGE_NOCACHE;
+        pd[pd_index] = (a & 0xFFFFFFFFFFE00000) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_LARGE | PAGE_PCD | PAGE_PWT;
+
+        asm volatile ("invlpg (%0)" : : "r" (a) : "memory");
     }
 }
 
@@ -122,39 +119,40 @@ void map_virtual(uint64_t virtual_addr, uint64_t phys_addr, uint64_t size) {
     }
 }
 
-VOID map_user_page(USINT64 *pml4, USINT64 vaddr, USINT64 paddr, USINT64 flags) {
-    INT pml4_i = (vaddr >> 39) & 0x1FF;
-    INT pdpt_i = (vaddr >> 30) & 0x1FF;
-    INT pd_i = (vaddr >> 21) & 0x1FF;
-    INT pt_i = (vaddr >> 12) & 0x1FF;
+void map_virtual_user(uint64_t virtual_addr, uint64_t phys_addr, uint64_t size) {
+    for(uint64_t offset = 0 ; offset < size ; offset += PAGE_SIZE) {
+        uint64_t vaddr = virtual_addr + offset;
+        uint64_t paddr = phys_addr + offset;
 
-    USINT64 *pdpt, *pd, *pt;
+        uint64_t pml_index = (vaddr >> 39) & 0x1FF;
+        uint64_t pdpt_index = (vaddr >> 30) & 0x1FF;
+        uint64_t pd_index = (vaddr >> 21) & 0x1FF;
+        uint64_t pt_index = (vaddr >> 12) & 0x1FF;
 
-    if(!(pml4[pml4_i] & PAGE_PRESENT)) {
-        pdpt = palloc_page();
-        memset(pdpt, 0, PAGE_SIZE);
-        pml4[pml4_i] = ((USINT64)pdpt) | flags;
-    } else {
-        pdpt = (USINT64*)(pml4[pml4_i] & PAGE_MASK);
+        // PML4
+        if(!(pml4_table[pml_index] & PAGE_PRESENT)){
+            uint64_t *new_pdpt = alloc_page();
+            pml4_table[pml_index] = (uint64_t)new_pdpt | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+        }
+        uint64_t *pdpt = (uint64_t*)(pml4_table[pml_index] & PAGE_MASK);
+
+        // PDPT
+        if(!(pdpt[pdpt_index] & PAGE_PRESENT)) {
+            uint64_t *new_pd = alloc_page();
+            pdpt[pdpt_index] = (uint64_t)new_pd | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+        }
+        uint64_t* pd = (uint64_t*)(pdpt[pdpt_index] & PAGE_MASK);
+
+        // PD
+        if (!(pd[pd_index] & PAGE_PRESENT)) {
+            uint64_t *new_pt = alloc_page();
+            pd[pd_index] = (uint64_t)new_pt | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+        }
+        uint64_t* pt = (uint64_t*)(pd[pd_index] & PAGE_MASK);
+
+        // PT (4KiB) dengan flag USER untuk akses user mode
+        pt[pt_index] = (paddr & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
     }
-
-    if(!(pdpt[pdpt_i] & PAGE_PRESENT)) {
-        pd = palloc_page();
-        memset(pd, 0, PAGE_SIZE);
-        pdpt[pdpt_i] = ((USINT64)pd) | flags;
-    } else {
-        pd = (USINT64*)(pdpt[pdpt_i] & PAGE_MASK);
-    }
-
-    if(!(pd[pd_i] & PAGE_PRESENT)) {
-        pt = palloc_page();
-        memset(pt, 0, PAGE_SIZE);
-        pd[pd_i] = ((USINT64)pt) | flags;
-    } else {
-        pt = (USINT64*)(pd[pd_i] & PAGE_MASK);
-    }
-
-    pt[pt_i] = (paddr & PAGE_MASK) | flags;
 }
 
 uint64_t align_up_2mb(uint64_t size) {
@@ -162,6 +160,9 @@ uint64_t align_up_2mb(uint64_t size) {
 }
 
 void init_paging(BOOT_INFO *bootInfo) {
+    // alok PML4
+    pml4_table = alloc_page();
+    memset(pml4_table, 0, PAGE_SIZE);
     serial_print("Start mapping PML4\n");
     // MAP Kernel Identity
     extern uint64_t _kernel_start;
@@ -179,18 +180,16 @@ void init_paging(BOOT_INFO *bootInfo) {
     serial_print("Kernel identity mapping done");
 
     // Map framebuffer GOP
-     map_framebuffer(bootInfo->GopBootInform->gop_framebase,
+    map_framebuffer(bootInfo->GopBootInform->gop_framebase,
       bootInfo->GopBootInform->gop_framesize);
-      serial_print("map_identity Map framebuffer GOP... \n");
+    serial_print("map_identity Map framebuffer GOP... \n");
 
     // Optional: map ACPI & BootInfo struct juga
     map_identity((uint64_t)bootInfo, 0x200000);
     map_identity((uint64_t)bootInfo->GopBootInform, 0x1000);
-    map_identity((uint64_t)bootInfo->AcpiBootInform, 0x200000);
+    map_identity((uint64_t)bootInfo->AcpiBootInform, sizeof(ACPI_BOOT_INFO));
 
     serial_print("map_identity map ACPI & BootInfo... \n");
-
-    serial_print("PML4 Mapping done\n");
 
     serial_print("\nBootInfo PTR: "); serial_print_hex((uint64_t)bootInfo); serial_print("\n");
     serial_print("Gop PTR: "); serial_print_hex((uint64_t)bootInfo->GopBootInform); serial_print("\n");
@@ -219,14 +218,19 @@ void init_paging(BOOT_INFO *bootInfo) {
     map_identity(0xFEE00000, 0x1000);
     map_identity(0xFEC000, 0x1000);
 
+    // activate mapping for userland
+    map_virtual_user(USERLAND_VIRTUAL_MAPPING, 0x04000000, 0x100000);
+    map_virtual_user(USERLAND_STACK - USERLAND_STACK_SIZE, 0x05000000, USERLAND_STACK_SIZE);
+    map_virtual_user(USERLAND_HEAP_BASE, 0x06000000, USERLAND_HEAP_SIZE);
+    serial_printf("Done mapping userland\n");
+
     // Activate paging
+    serial_print("PML4 Mapping done\n");
     load_pml4(pml4_table);
     kernel_pml4 = pml4_table;
     serial_print("Paging activated\n");
     serial_printf("Paging active at: %X\n\n", pml4_table);
 }
-
-
 
 uint64_t virt_to_phys(uint64_t virtual_addr) {
     uint64_t pml_index = (virtual_addr >> 39) & 0x1FF;

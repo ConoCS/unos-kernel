@@ -4,6 +4,11 @@ void *system_font_psf = NULL;
 const uint8_t* system_glyph_data = NULL;
 int glyph_width, glyph_height, glyph_size;
 PSFHeader *system_psf_info = NULL;
+INT term_cursor_x = 0;
+INT term_cursor_y = 0;
+INT GraphicOK = 0;
+
+#define defaultcolor 0xFFFFFFFF
 
 void InitPSFFontGraphic() {
     system_font_psf = load_psf_file("/UnOS/font/Lat15-VGA16.psf");
@@ -20,15 +25,96 @@ void PreparingGlobalPSFFont() {
     glyph_height = system_psf_info->glyph_height;
     glyph_size = system_psf_info->glyph_size;
     system_glyph_data = system_psf_info->glyph_data;
+    GraphicOK = 1;
 }
 
-void DrawSimplePSFText(const char *text, int x, int y, uint32_t color) {
-    while(*text) {
-        char ch = *text;
-        const uint8_t *glyph = system_glyph_data + (ch * glyph_size );
-        draw_glyph(x, y, glyph, glyph_width, glyph_height, color);
-        x += glyph_width;
+UNFUNCTION
+DrawSimplePSFText(
+    IN CONST CHARA8 *text,
+    IN USINT32 Color
+) {
+    INT GlyphWidth = glyph_width;
+    INT GlyphHeight = glyph_height;
+    const int term_cols = screen_width / GlyphWidth;
+    const int term_rows = screen_height / GlyphHeight;
+
+    while (*text) {
+        CHARA8 ch = *text;
+
+        if (ch == '\n') {
+            term_cursor_x = 0;
+            term_cursor_y++;
+        } else if (ch == '\r') {
+            term_cursor_x = 0;
+        } else {
+            CONST USINT8 *glyph = system_glyph_data + (ch * glyph_size);
+            draw_glyph(term_cursor_x * GlyphWidth, term_cursor_y * GlyphHeight,
+                       glyph, GlyphWidth, GlyphHeight, Color);
+            term_cursor_x++;
+        }
+
+        if (term_cursor_x >= term_cols) {
+            term_cursor_x = 0;
+            term_cursor_y++;
+        }
+
+        if (term_cursor_y >= term_rows) {
+            TerminalTTYScrollUp(0x00000000); // scroll ke atas dengan background hitam
+            delay(50);
+            term_cursor_y = term_rows - 1;   // jaga cursor tetap di baris paling bawah
+        }
+
         text++;
+    }
+}
+
+UNFUNCTION
+PSFPutChar(
+    IN CHARA8 ch,
+    IN USINT32 Color
+)
+{
+    // Cek apakah data glyph belum siap
+    if (system_glyph_data == NULL || glyph_size == 0 || screen_width == 0 || screen_height == 0)
+        return; // Skip kalau belum diinisialisasi
+
+    INT GlyphWidth = glyph_width;
+    INT GlyphHeight = glyph_height;
+    const int term_cols = screen_width / GlyphWidth;
+    const int term_rows = screen_height / GlyphHeight;
+
+
+    if(ch == '\n') {
+        term_cursor_x = 0;
+        term_cursor_y++;
+    } else if (ch == '\r') {
+        term_cursor_x = 0;
+    } else if(ch == '\b') {
+        if(term_cursor_x > 0) {
+            term_cursor_x--;
+        } else if (term_cursor_y > 0) {
+            term_cursor_y--;
+            term_cursor_x = term_cols - 1;
+        }
+        draw_glyph(term_cursor_x * glyph_width, term_cursor_y * glyph_height,
+             system_glyph_data + (' ' * glyph_size), glyph_width,
+              glyph_height, Color);
+    } else {
+        CONST USINT8 *glyph = system_glyph_data + (ch * glyph_size);
+        draw_glyph(term_cursor_x * glyph_width, term_cursor_y * glyph_height, 
+                    glyph, glyph_width, glyph_height, Color);
+        term_cursor_x++;
+    }
+
+    if(term_cursor_x >= term_cols) {
+        term_cursor_x = 0;
+        term_cursor_y++;
+    }
+
+    if(term_cursor_y >= term_rows) {
+        TerminalTTYScrollUp(0x00000000); // scroll ke atas dengan background hitam
+        delay(50);
+        term_cursor_y = term_rows - 1;   // jaga cursor tetap di baris paling bawah
     }
 }
 
@@ -96,11 +182,109 @@ void* load_psf_file(const char *path) {
     int read_bytes = Fat32Read(file, 0, buffer, file_size);
     serial_printf("[DEBUG] Bytes read: %d\n", read_bytes);
 
-    if (read_bytes != file_size) {
+    if ((size_t)read_bytes != file_size) {
         serial_printf("[Error] Gagal membaca file %s (read %d bytes)\n", path, read_bytes);
         return NULL;
     }
 
     serial_printf("[OK] File %s berhasil dibaca (%d bytes)\n", path, read_bytes);
     return buffer;
+}
+
+UNFUNCTION
+PSFPrintf (
+    IN CONST CHARA8 *Text,
+    ...
+) {
+    va_list args;
+    va_start(args, Text);
+
+    while(*Text) {
+        if(*Text == '%') {
+            Text++;
+
+            CHARA8 Buf[128];
+            CONST CHARA8 *str = NULL;
+            switch(*Text) {
+                case 'd':
+                case 'i': {
+                    int val = va_arg(args, INT);
+                    itoa(val, Buf);
+                    DrawSimplePSFText(Buf, defaultcolor);
+                    break;
+                }
+                case 's': {
+                    str = va_arg(args, const char*);
+                    DrawSimplePSFText(str, defaultcolor);
+                    break;
+                }
+                case 'c': {
+                    PSFPutChar((CHARA8)va_arg(args, int), defaultcolor);
+                    break;
+                }
+                case 'u': {
+                    unsigned int unsignedint = va_arg(args, unsigned int);
+                    utoa((USINT64)unsignedint, Buf);
+                    DrawSimplePSFText(Buf, defaultcolor);
+                    break;
+                }
+                case 'x':
+                case 'X': {
+                    int uppercase = (*Text == 'X');
+                    USINT64 val = va_arg(args, USINT64);
+                    xtoa(val, Buf, uppercase);
+                    DrawSimplePSFText("0x", defaultcolor);
+                    DrawSimplePSFText(Buf, defaultcolor);
+                }
+                default:
+                // Unknown format specifier, just print it raw
+                PSFPutChar('%', defaultcolor);
+                PSFPutChar(*Text, defaultcolor);
+                break;
+            }
+        } else {
+            PSFPutChar(*Text, defaultcolor);    
+        }
+        Text++;
+    }
+}
+
+UNFUNCTION
+ResetCursorX(
+
+)
+{
+    term_cursor_x = 0;
+}
+
+UNFUNCTION
+ResetCursorY(
+
+)
+{
+    term_cursor_y = 0;
+}
+
+UNFUNCTION
+TerminalTTYScrollUp(
+    IN USINT32 Color_Background
+) {
+    INT bytes_per_pixel = 4;
+
+    for(USINT32 y = 0; y < screen_height - glyph_height; y++) {
+        memcpy(
+            framebuffer + y * screen_width,
+            framebuffer + (y + glyph_height) * screen_width,
+            screen_width * bytes_per_pixel
+        );
+    }
+
+    // Clear baris terakhir (paling bawah)
+    for (USINT32 y = screen_height - glyph_height; y < screen_height; y++) {
+        for (USINT32 x = 0; x < screen_width; x++) {
+            framebuffer[y * screen_width + x] = Color_Background;
+        }
+    }
+
+    term_cursor_y--;
 }

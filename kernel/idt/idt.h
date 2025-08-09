@@ -25,4 +25,10 @@ void delay(int ms);
 extern volatile uint32_t minute;
 extern volatile uint8_t second;
 
+static inline void short_pause() {
+    for (volatile int i = 0; i < 100000; i++) {
+        __asm__ __volatile__("pause");
+    }
+}
+
 #endif

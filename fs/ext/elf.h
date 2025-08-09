@@ -1,8 +1,22 @@
 #pragma once
-#include <stdint.h>
+#include <unostype.h>
 
 #define EI_NIDENT 16
 #define PT_LOAD 1
+#define ELF_OK 0
+#define ELF_ERR_BADMAGIC -1
+#define ELF_ERR_UNSUPPORTED -2
+#define ELF_ERR_NOMEM -3
+#define ELF_ERR_MAPFAIL -4
+
+#ifdef UNOS_ELF_USERLAND_MACRO
+
+    #define ELFLOAD
+    #define ELFSTART
+    #define UNSTARTUSERLAND
+    #define UNSYSCALLINIT
+
+#endif
 
 typedef struct {
     unsigned char e_ident[EI_NIDENT];
@@ -31,5 +45,3 @@ typedef struct {
     uint64_t p_memsz;
     uint64_t p_align;
 } Elf64_Phdr;
-
-int LoadELF64(const char *path);

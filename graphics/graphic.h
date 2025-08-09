@@ -15,4 +15,3 @@ void RaiseKernelPanicError(uint64_t error_code, KernelPanic error_type);
 void draw_glyph(int x, int y, const uint8_t *glyph, int width, int height, uint32_t color);
 void InitPSFFontGraphic();
 void PreparingGlobalPSFFont();
-void DrawSimplePSFText(const char *text, int x, int y, uint32_t color);

@@ -51,18 +51,14 @@ void isr13_handler_c(struct interrupt_frame *frame, uint64_t error_code) {
     }
 }
 
-static inline void short_pause() {
-    for (volatile int i = 0; i < 10000000; i++) __asm__ __volatile__("pause");
-}
-
 __attribute__((noreturn))
 void isr14_handler_c(uint64_t error_code) {
-    RaiseKernelPanicError(error_code, MEMORY_PAGE_FAULT_PAGE_UNREADY);
-    short_pause();
     serial_print("EXCEPTION: Exception happened \n");
     serial_print("PLEASE HARD RESET YOUR COMPUTER. THE KERNEL IS HALTING\n\n");
     serial_print("ERROR: MEMORY_PAGE_FAULT_PAGE_UNREADY\n");
     serial_printf("Error Code: %X\n", error_code);
+    short_pause();
+    RaiseKernelPanicError(error_code, MEMORY_PAGE_FAULT_PAGE_UNREADY);
 
     __asm__ __volatile__ (
         "cli\n\t"

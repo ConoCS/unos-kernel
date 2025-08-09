@@ -107,12 +107,18 @@ typedef INTPTR   VPTR_INTPTR; // Virtual pointer as intptr_t
 
 #define UNUSED(x) (void)(x)
 
-#ifndef _VALUE_RETURN_TYPE_
-#define _VALUe_RETURN_TYPE_
+#ifndef _VALUE_FUNC_RETURN_TYPE_
+#define _VALUE_FUNC_RETURN_TYPE_
 
 typedef void FUNCNOSTATUS;
 typedef int FUNCWITHSTATUS;
+typedef void UNFUNCTION;
+typedef int UNSTATUS;
 
+#endif
+
+#ifdef _UNOS_LOKAL_
+#include <unostype-indo.h>
 #endif
 
 #endif

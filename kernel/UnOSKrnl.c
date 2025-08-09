@@ -31,7 +31,12 @@
  BOOT_INFO *bootInfo;
 
 
-VOID TryAhciRead(IN HBA_PORT *port, IN uint64_t start_lba, IN uint32_t sector_count) {
+FUNCNOSTATUS 
+TryAhciRead(
+    IN HBA_PORT *port,
+    IN uint64_t start_lba,
+    IN uint32_t sector_count
+) {
     UINTPTR phys;
     VOID *virt = palloc_aligned_DMA(sector_count * 512, PAGE_SIZE, &phys);
 
@@ -49,7 +54,7 @@ VOID TryAhciRead(IN HBA_PORT *port, IN uint64_t start_lba, IN uint32_t sector_co
     serial_printf("\n");
 }
 
-VOID KernelPreSetup(IN BOOT_INFO *Info) {
+FUNCNOSTATUS KernelPreSetup(IN BOOT_INFO *Info) {
     remap_pic();
     init_idt(); /*SETUP IDT*/
     pci_scan();
@@ -70,7 +75,7 @@ VOID KernelPreSetup(IN BOOT_INFO *Info) {
 } 
 
 __attribute__((noreturn))
-VOID KernelMain(BOOT_INFO *BootInfoArg) {
+FUNCNOSTATUS KernelMain(BOOT_INFO *BootInfoArg) {
     __asm__ volatile("cli");
     init_serial();
     serial_print(ANSI_BOLD_ON "UnOS Kernel (C) 2025 ConoCS | GPLv3 Licensed\n\n" ANSI_BOLD_OFF);
@@ -80,7 +85,7 @@ VOID KernelMain(BOOT_INFO *BootInfoArg) {
 
     __asm__ volatile("sti");
     connect_to_framebuffer();
-    drawfullscreen(0x000000FF);
+    drawfullscreen(0xFF000000);
     ShowBGRT(BootInfoArg->AcpiBootInform->ACPIBGRT);
 
     serial_printf("Checkpoint 1\n");
@@ -93,10 +98,8 @@ VOID KernelMain(BOOT_INFO *BootInfoArg) {
 
     InitPSFFontGraphic();
     PreparingGlobalPSFFont();
-    DrawSimplePSFText("UnOS Kernel (C) 2025 ConoCS", 10, 10, 0xFFFFFFFF);
-    DrawSimplePSFText("GPLv3 Licensed", 10, 30, 0xFFFFFFFF);
-    DrawSimplePSFText("Kernel started", 10, 50, 0xFFFFFFFF);
-    
+    PSFPrintf("Copyright UnOS Team 2025 C All Right Reserved\n");
+
     DisableWatchdogWhile(WatchdogUnOSKrnl);
 
     init_terminal();

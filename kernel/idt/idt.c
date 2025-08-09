@@ -22,24 +22,10 @@ extern void isr14();
 extern void isr32();
 extern void isr33();
 extern void isr_mouse();
-GLOBAL VOID syscall_handler_wrapper();
 static struct IDTEntry idt[256];
 
 volatile uint32_t minute = 0;
 volatile uint8_t second = 0;
-
-static inline void outb(uint16_t port, uint8_t val) {
-    asm volatile ("outb %0, %1" : : "a"(val), "Nd"(port));
-}
-
-static inline uint8_t inb(uint16_t port) {
-    uint8_t ret;
-    asm volatile("inb %1, %0" 
-            : "=a"(ret)
-            : "Nd"(port));
-    return ret;
-}
-
 
 static void set_idt_entry(int vector, void(*handler)(), INT DPL) {
     uint64_t addr = (uint64_t)handler;
@@ -63,7 +49,6 @@ void init_idt() {
     set_idt_entry(0x20, isr32, 0);
     set_idt_entry(0x21, isr33, 0);
     set_idt_entry(0x2C, isr_mouse, 0);
-    set_idt_entry(0x80, syscall_handler_wrapper, 3);
 
     struct IDTDescriptor idtr = {
         .size = sizeof(idt) - 1,

@@ -1,6 +1,5 @@
 #include <unoskrnl.h>
 
-#define NULL 0
 
 extern GOP_BOOT_INFO *gopInfo;
 
@@ -71,22 +70,47 @@ void draw_glyph(int x, int y, const uint8_t *glyph, int width, int height, uint3
 }
 
 void RaiseKernelPanicError(uint64_t error_code, KernelPanic error_type) {
+    (void)error_code;
     drawfullscreen(0xFFFF0000);
-    DrawSimplePSFText("EXCEPTION: EXCEPTION HAPPENED", 10, 10, 0xFFFFFFFF);
-    DrawSimplePSFText("PLEASE HARD RESET YOUR COMPUTER. THE KERNEL IS HALTING", 10, 30, 0xFFFFFFFF);
+    ResetCursorX();
+    ResetCursorY();
+    DrawSimplePSFText("EXCEPTION: EXCEPTION HAPPENED\n",  0xFFFFFFFF);
+    DrawSimplePSFText("PLEASE HARD RESET YOUR COMPUTER. THE KERNEL IS HALTING\n", 0xFFFFFFFF);
     switch(error_type) {
         case MEMORY_PAGE_FAULT_PAGE_UNREADY:
-            DrawSimplePSFText("ERROR: MEMORY_PAGE_FAULT_PAGE_UNREADY", 10, 50, 0xFFFFFFFF);
+            DrawSimplePSFText("ERROR: MEMORY_PAGE_FAULT_PAGE_UNREADY\n", 0xFFFFFFFF);
             break;
         case WATCHDOG_TIMEOUT_TIMER_EXCEPTION:
-            DrawSimplePSFText("ERROR: WATCHDOG_TIMEOUT_TIMER_EXCEPTION", 10, 50, 0xFFFFFFFF);
+            DrawSimplePSFText("ERROR: WATCHDOG_TIMEOUT_TIMER_EXCEPTION\n", 0xFFFFFFFF);
             break;
         case CPU_FAULT_ACTIVATE_GENERAL_PROTECTION:
-            DrawSimplePSFText("ERROR: CPU_FAULT_ACTIVATE_GENERAL_PROTECTION", 10, 50, 0xFFFFFFFF);
+            DrawSimplePSFText("ERROR: CPU_FAULT_ACTIVATE_GENERAL_PROTECTION\n", 0xFFFFFFFF);
+            break;
+        case FAILED_INITIALIZATION_USERLAND:
+            serial_printf("ERROR: FAILED_INITIALIZATION_USERLAND\n", 0xFFFFFFFF);
             break;
         default:
-            DrawSimplePSFText("ERROR: UNKNOWN_EXCEPTION", 10, 50, 0xFFFFFFFF);
+            DrawSimplePSFText("ERROR: UNKNOWN_EXCEPTION\n", 0xFFFFFFFF);
             break;
     }
+    if(error_code) {
+        serial_printf("ERROR CODE: %X\n", error_code);
+    }
+
+    short_pause();
+
+     __asm__ __volatile__ (
+        "cli\n\t"
+        "mov $0xFE, %%al\n\t"
+        "out %%al, $0x64\n\t"
+        "hlt\n\t"
+        "jmp .\n\t"
+        :
+        :
+        : "al"
+    );
+
+    __builtin_unreachable();
+
+    AcpiShutdown();
 }
-    
