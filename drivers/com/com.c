@@ -32,13 +32,14 @@ INT is_transit_empty() {
 VOID serial_write_char (char a) {
     while(is_transit_empty() == 0); 
     outb(COM1, a);
-    
+    if(GraphicOK == 1) PSFPutChar(a, defaultcolor);
 }
 
 VOID serial_print(const char *str) {
     while(*str) {
         if(*str == '\n') serial_write_char('\r');
-        serial_write_char(*str++);
+        serial_write_char(*str);
+        str++;
     }
 }
 

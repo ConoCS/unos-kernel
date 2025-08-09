@@ -75,6 +75,7 @@ VOID DetectWatchdog(WatchdogUnOS *WD) {
 }
 
 VOID WDCallback(WatchdogUnOS *WD) {
+    (void)WD;
     RaiseKernelPanicError(0x0000121, WATCHDOG_TIMEOUT_TIMER_EXCEPTION);
     serial_printf("EXCEPTION: EXCEPTION HAPPENED\n");
     serial_printf("PLEASE HARD RESET YOUR COMPUTER. THE KERNEL IS HALTING\n");

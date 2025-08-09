@@ -362,6 +362,9 @@ int Fat32Read(VFSNode *node, size_t offset, void* buffer, size_t size) {
         //serial_printf("  -> dst = %p\n", user_buf + total_read);
         //serial_printf("  -> dma_buf = %p (phys=0x%llx)\n", dma_buf, phys);
         //serial_printf("  -> read_offset=%zu, read_len=%zu\n", read_offset, read_len);
+        serial_printf("[MEMCPY] dst=%p src=%p total_read=%u read_offset=%u len=%u\n",
+            user_buf + total_read, (uint8_t*)dma_buf + read_offset, total_read, read_offset, read_len);
+
         memcpy(user_buf + total_read, (uint8_t*)dma_buf + read_offset, read_len);
 
         pfree_aligned_DMA(dma_buf, spc * bps);
