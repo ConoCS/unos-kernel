@@ -6,6 +6,8 @@ int glyph_width, glyph_height, glyph_size;
 PSFHeader *system_psf_info = NULL;
 INT term_cursor_x = 0;
 INT term_cursor_y = 0;
+INT temp_term_cursor_x = 0;
+INT temp_term_cursor_y = 0;
 INT GraphicOK = 0;
 
 #define defaultcolor 0xFFFFFFFF
@@ -266,6 +268,12 @@ ResetCursorY(
 }
 
 UNFUNCTION
+SetCursor(IN USINT32 X, IN USINT32 Y){
+    term_cursor_x = X;
+    term_cursor_y = Y;
+}
+
+UNFUNCTION
 TerminalTTYScrollUp(
     IN USINT32 Color_Background
 ) {
@@ -287,4 +295,38 @@ TerminalTTYScrollUp(
     }
 
     term_cursor_y--;
+}
+
+UNFUNCTION 
+SetCursorMiddle(){
+    int char_width = glyph_width;
+    int char_height = glyph_height;
+
+    temp_term_cursor_x = term_cursor_x;
+    temp_term_cursor_y = term_cursor_y;
+    
+    term_cursor_y = screen_height / (2 * char_height);
+}
+
+UNFUNCTION
+PrintCentered(IN CONST CHARA8* Text) {
+    int char_width = glyph_width;
+    int char_height = glyph_height;
+
+    int max_charas_per_line = screen_width / char_width;
+
+    int text_length = 0;
+    while(Text[text_length] != '\0') {
+        text_length++;
+    }
+
+    term_cursor_x = (max_charas_per_line - text_length) / 2;
+    
+    serial_printf(Text);
+}
+
+UNFUNCTION 
+ResetLastCursorTTY(){
+    term_cursor_x = temp_term_cursor_x;
+    term_cursor_y = temp_term_cursor_y;
 }

@@ -7,10 +7,10 @@ WatchdogUnOS *InitWatchdog(USINT32 counter, USINT32 timeout, CHARA8 *Tag, VOID(*
     if(WatchdogUnOSKrnl == NULL) {
         WatchdogUnOSKrnl = (WatchdogUnOS*)kmalloc(sizeof(WatchdogUnOS));
         if (WatchdogUnOSKrnl == NULL) {
-            serial_printf("[Error] WatchdogUnOSKrnl kmalloc failed\n");
+            Printk(KERR, "WatchdogUnOSKrnl kmalloc failed\n");
             return NULL;
         }
-        serial_printf("Pointer kmalloc WatchdogUnOSKrnl: %p\n", WatchdogUnOSKrnl);
+        Printk(KINFO, "Pointer kmalloc WatchdogUnOSKrnl: %p\n", WatchdogUnOSKrnl);
         memset(WatchdogUnOSKrnl, 0, sizeof(WatchdogUnOS));
     }
     // Kalo watchdog sudah aktif, return
@@ -28,7 +28,7 @@ WatchdogUnOS *InitWatchdog(USINT32 counter, USINT32 timeout, CHARA8 *Tag, VOID(*
     WatchdogUnOSKrnl->Tag = 0;
 
     //printf watchdog aktif
-    serial_printf("[OK] Watchdog aktif\n");
+    Printk(KSUCCESS, " Watchdog aktif\n");
 
     return WatchdogUnOSKrnl;
 }
@@ -52,14 +52,14 @@ VOID WatchdogCountPlus(WatchdogUnOS *WD) {
 VOID DisableWatchdogWhile(WatchdogUnOS *WD) {
     if (WD && WD->active == TRUE) {
         WD->active = FALSE;
-        serial_printf("[WD] Watchdog dinonaktifkan\n");
+        Printk(KSUCCESS, "[WD] Watchdog dinonaktifkan\n");
     }
 }
 
 VOID EnableWatchdogAgain(WatchdogUnOS *WD) {
     if(WD && WD->active == FALSE) {
         WD->active = TRUE;
-        serial_printf("[WD] Watchdog diaktifkan kembali\n");
+        Printk(KSUCCESS, "[WD] Watchdog diaktifkan kembali\n");
     }
 }
 

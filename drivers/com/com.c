@@ -32,7 +32,7 @@ INT is_transit_empty() {
 VOID serial_write_char (char a) {
     while(is_transit_empty() == 0); 
     outb(COM1, a);
-    if(GraphicOK == 1) PSFPutChar(a, defaultcolor);
+    //if(GraphicOK == 1) PSFPutChar(a, defaultcolor);
 }
 
 VOID serial_print(const char *str) {
@@ -154,6 +154,101 @@ VOID serial_printf(const char *fmt, ...) {
         fmt++;
     }
     va_end(args);
+}
+
+VOID serial_vprintf(const char *fmt, va_list args) {
+    while(*fmt) {
+        if(*fmt == '%') {
+            fmt++;
+            //Parse flag
+            BOOL zero_pad = FALSE;
+            if (*fmt == '0') {
+                zero_pad = TRUE;
+                fmt++;
+            }
+
+            //parse width
+            INT width = 0;
+            while(*fmt >= '0' && *fmt <= '9') {
+                width = width * 10 + (*fmt - '0');
+                fmt++;
+            }
+
+            CHARA8 buf[32];
+            const char *str = NULL;
+
+            switch (*fmt) {
+                case 's':
+                    {str = va_arg(args, const char*);
+                    serial_print(str);
+                    break;}
+                case 'c':
+                    {serial_write_char((char)va_arg(args, int));
+                    break;}
+                case 'd':
+                case 'i':
+                    {int val = va_arg(args, int);
+                    itoa(val, buf);
+                    int len = strlen(buf);
+                    for (int i = len; i < width; i++) serial_write_char(zero_pad ? '0' : ' ');
+                    serial_print(buf);
+                    break;}
+                case 'u':
+                    {unsigned int val = va_arg(args, unsigned int);
+                    utoa(val, buf);
+                    int len = strlen(buf);
+                    for (int i = len; i < width; i++) serial_write_char(zero_pad ? '0' : ' ');
+                    serial_print(buf);
+                    break;}
+                case 'x':
+                    {int uppercase = (*fmt == 'X');
+                    uint64_t val = va_arg(args, uint64_t);
+                    xtoa(val, buf, uppercase);
+                    int len = strlen(buf);
+                    for (int i = len; i < width; i++) serial_write_char(zero_pad ? '0' : ' ');
+                    serial_print(buf);
+                    break;}
+                case 'X':
+                    {int uppercase = (*fmt == 'X');
+                    uint64_t val = va_arg(args, uint64_t);
+                    xtoa(val, buf, uppercase);
+                    int len = strlen(buf);
+                    for (int i = len; i < width; i++) serial_write_char(zero_pad ? '0' : ' ');
+                    serial_print(buf);
+                    break;}
+                case 'p':
+                    {VOID *ptr = va_arg(args, VPTR);
+                    xtoa((uint64_t)(uintptr_t)ptr, buf, 0);
+                    serial_print("0x");
+                    serial_print(buf);
+                    break;}
+                case 'l':
+                    if (*(fmt + 1) == 'l' && *(fmt + 2) == 'u') {
+                        fmt += 2;
+                        unsigned long long val = va_arg(args, unsigned long long);
+                        utoa(val, buf);
+                        serial_print(buf);
+                    } else {
+                        serial_write_char('%');
+                        serial_write_char('l');
+                        serial_write_char(*(fmt + 1));
+                        fmt+= 2;
+                        continue;
+                    }
+                break;
+                case '%':
+                    serial_write_char('%');
+                    break;
+                default:
+                    serial_write_char('%');
+                    serial_write_char(*fmt);
+                    
+            }
+        } else {
+            serial_write_char(*fmt);
+        }
+        fmt++;
+    }
 }
 
 

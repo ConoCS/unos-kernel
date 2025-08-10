@@ -73,4 +73,13 @@ TerminalTTYScrollUp(
     IN USINT32 Color_Background
 );
 
+UNFUNCTION
+PrintCentered(IN CONST CHARA8* Text);
+
+UNFUNCTION 
+ResetLastCursorTTY();
+
+UNFUNCTION 
+SetCursorMiddle();
+
 #endif

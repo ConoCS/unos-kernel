@@ -1,6 +1,6 @@
 #pragma once
 #include <unostype.h>
-#include "kernel/idt/errornumber/errnum.h"
+#include "kernel/logging/panic/panic.h"
 
 GLOBAL uint32_t *framebuffer;
 GLOBAL uint32_t screen_width;
