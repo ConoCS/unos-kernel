@@ -1,6 +1,5 @@
 #include <unoskrnl.h>
 
-#define PHYS_HEAP_START 0x1000000
 #define MAX_TRACKED_PAGES 8192 // misalnya 32MB / 4KB
 #define DMA_VIRT_SIZE (512 * 1024 * 1024ULL) //512MB;
 static const uint64_t dma_virt_base = KERNEL_DMA_VIRT_BASE;
@@ -36,7 +35,7 @@ void *palloc_page() {
         }
     }
 
-    serial_printf("[palloc_page] Out of physical pages!\n");
+    Printk(KERR, "[palloc_page] Out of physical pages!\n");
     return NULL;
 }
 
@@ -155,7 +154,8 @@ void *palloc_aligned(size_t size, size_t align) {
     return addr;
 }
 
-void *palloc_aligned_DMA(IN size_t size, IN size_t align, OUT uintptr_t *phys_out) {
+void *palloc_aligned_DMA(IN size_t size, size_t align, OUT uintptr_t *phys_out) {
+    UNUSED(align);
     size_t map_size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
     
     if (dma_heap_curr & (PAGE_SIZE - 1)) {
@@ -178,7 +178,7 @@ void *palloc_aligned_DMA(IN size_t size, IN size_t align, OUT uintptr_t *phys_ou
     }
 
     if (phys_out) *phys_out = phys;
-    serial_printf("[DMA_ALLOC] virt=%p, phys=%p, size=%u\n", virt, (void*)phys, map_size);
+   Printk(KINFO, "DMAALLOC: virt=%p, phys=%p, size=%u\n", virt, (void*)phys, map_size);
     return virt;
 }
 

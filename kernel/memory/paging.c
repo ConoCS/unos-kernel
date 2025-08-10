@@ -74,6 +74,7 @@ void map_framebuffer(uint64_t addr, uint64_t size) {
         pd[pd_index] = (a & 0xFFFFFFFFFFE00000) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_LARGE | PAGE_PCD | PAGE_PWT;
 
         asm volatile ("invlpg (%0)" : : "r" (a) : "memory");
+        
     }
 }
 
@@ -132,32 +133,114 @@ void map_virtual_user(uint64_t virtual_addr, uint64_t phys_addr, uint64_t size) 
         // PML4
         if(!(pml4_table[pml_index] & PAGE_PRESENT)){
             uint64_t *new_pdpt = alloc_page();
-            pml4_table[pml_index] = (uint64_t)new_pdpt | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+            memset(new_pdpt, 0, PAGE_SIZE);
+            pml4_table[pml_index] = virt_to_phys_simple((uint64_t)new_pdpt) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
         }
         uint64_t *pdpt = (uint64_t*)(pml4_table[pml_index] & PAGE_MASK);
 
         // PDPT
         if(!(pdpt[pdpt_index] & PAGE_PRESENT)) {
             uint64_t *new_pd = alloc_page();
-            pdpt[pdpt_index] = (uint64_t)new_pd | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+            memset(new_pd, 0, PAGE_SIZE);
+            pdpt[pdpt_index] = virt_to_phys_simple((uint64_t)new_pd) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
         }
         uint64_t* pd = (uint64_t*)(pdpt[pdpt_index] & PAGE_MASK);
 
         // PD
         if (!(pd[pd_index] & PAGE_PRESENT)) {
             uint64_t *new_pt = alloc_page();
-            pd[pd_index] = (uint64_t)new_pt | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+            memset(new_pt, 0, PAGE_SIZE);
+            pd[pd_index] = virt_to_phys_simple((uint64_t)new_pt) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
         }
         uint64_t* pt = (uint64_t*)(pd[pd_index] & PAGE_MASK);
 
         // PT (4KiB) dengan flag USER untuk akses user mode
         pt[pt_index] = (paddr & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+        asm volatile ("invlpg (%0)" : : "r" (vaddr) : "memory");
+
+    }
+}
+
+VOID
+map_virtual_user_advanced(USINT64 virtual_addr, USINT64 phys_addr, USINT64 size, USINT64 flags) {
+    for(USINT64 offset = 0; offset < size; offset += PAGE_SIZE) {
+        USINT64 vaddr = virtual_addr + offset;
+        USINT64 paddr = phys_addr + offset;
+
+        uint64_t pml_index = (vaddr >> 39) & 0x1FF;
+        uint64_t pdpt_index = (vaddr >> 30) & 0x1FF;
+        uint64_t pd_index = (vaddr >> 21) & 0x1FF;
+        uint64_t pt_index = (vaddr >> 12) & 0x1FF;
+
+        // PML4
+        if(!(pml4_table[pml_index] & PAGE_PRESENT)) {
+            USINT64 *new_pdpt = alloc_page();
+            memset(new_pdpt, 0, PAGE_SIZE);
+            pml4_table[pml_index] = virt_to_phys_simple((USINT64)new_pdpt) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+        }
+        USINT64 *pdpt = (USINT64*)(pml4_table[pml_index] & PAGE_MASK);
+
+        //PDPT
+        if(!(pdpt[pdpt_index] & PAGE_PRESENT)) {
+            USINT64 *new_pd = alloc_page();
+            memset(new_pd, 0, PAGE_SIZE);
+            pdpt[pdpt_index] = virt_to_phys_simple((USINT64)new_pd) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+        }
+        USINT64 *pd = (USINT64*)(pdpt[pdpt_index] & PAGE_MASK);
+
+        //PD
+        if(!(pd[pd_index] & PAGE_PRESENT)) {
+            USINT64 *new_pt = alloc_page();
+            memset(new_pt, 0, PAGE_SIZE);
+            pd[pd_index] = virt_to_phys_simple((USINT64)new_pt) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+        }
+        USINT64 *pt = (USINT64*)(pd[pd_index] & PAGE_MASK);
+
+        //PT 4KiB Page
+        pt[pt_index] = (paddr & PAGE_MASK) | flags;
+        Printk(KINFO, "Mapping VA 0x%x to PA 0x%x with flags 0x%x\n", vaddr, paddr, flags);
+
+        // after setting: read back the PT entry and print
+        uint64_t pte = pt[pt_index];
+        Printk(KINFO, "PTE readback for VA 0x%x: 0x%x\n", (unsigned long long)vaddr, (unsigned long long)pte);
+        // Invalidate the TLB entry for this virtual address
+        asm volatile ("invlpg (%0)" : : "r" (vaddr) : "memory");
     }
 }
 
 uint64_t align_up_2mb(uint64_t size) {
     return (size + 0x1FFFFF) & ~0x1FFFFF;
 }
+
+static inline void* phys_to_virt(uint64_t phys_addr) {
+    // Misal kernel mapping physical RAM mulai dari KERNEL_VIRT_BASE
+    return (void*)(phys_addr + KERNEL_VIRT_BASE - KERNEL_PHYS_BASE);
+}
+
+void dump_pte_for_vaddr(uint64_t vaddr) {
+    uint64_t pml = (vaddr >> 39) & 0x1FF;
+    uint64_t pdpt = (vaddr >> 30) & 0x1FF;
+    uint64_t pd  = (vaddr >> 21) & 0x1FF;
+    uint64_t pt  = (vaddr >> 12) & 0x1FF;
+
+    uint64_t pml_e = pml4_table[pml];
+    uint64_t *pdpt_table = (uint64_t*)(phys_to_virt(pml_e & PAGE_MASK));
+    uint64_t pdpt_e = pdpt_table[pdpt];
+    uint64_t *pd_table = (uint64_t*)(phys_to_virt(pdpt_e & PAGE_MASK));
+    uint64_t pd_e = pd_table[pd];
+    uint64_t *pt_table = (uint64_t*)(phys_to_virt(pd_e & PAGE_MASK));
+    uint64_t pte = pt_table[pt];
+
+    serial_printf("Dump vaddr %p:\nPML4e=0x%016llx\nPDPTe=0x%016llx\nPDe=0x%016llx\nPTe=0x%016llx\n",
+                  vaddr, pml_e, pdpt_e, pd_e, pte);
+
+    serial_printf("PTE flags: present=%d write=%d user=%d NX=%d\n",
+        (pte & 1) ? 1:0,
+        (pte & 2) ? 1:0,
+        (pte & 4) ? 1:0,
+        (pte >> 63) & 1);
+}
+
 
 void init_paging(BOOT_INFO *bootInfo) {
     // alok PML4
@@ -219,7 +302,7 @@ void init_paging(BOOT_INFO *bootInfo) {
     map_identity(0xFEC000, 0x1000);
 
     // activate mapping for userland
-    map_virtual_user(USERLAND_VIRTUAL_MAPPING, 0x04000000, 0x100000);
+    //map_virtual_user(USERLAND_VIRTUAL_MAPPING, 0x0400000, 0x10000000);
     map_virtual_user(USERLAND_STACK - USERLAND_STACK_SIZE, 0x05000000, USERLAND_STACK_SIZE);
     map_virtual_user(USERLAND_HEAP_BASE, 0x06000000, USERLAND_HEAP_SIZE);
     serial_printf("Done mapping userland\n");
@@ -250,4 +333,16 @@ uint64_t virt_to_phys(uint64_t virtual_addr) {
     uint64_t phys_base = pde & 0xFFFFFFFFFFE00000;
 
     return phys_base + offset;
+}
+
+
+uint64_t virt_to_phys_simple(uint64_t virt) {
+    if (virt >= KERNEL_VIRT_BASE) {
+        Printk(KSUCCESS, "Returning virt\n");
+        return virt - KERNEL_VIRT_BASE + KERNEL_PHYS_BASE;
+    } else {
+        // Kalau bukan area kernel heap, return 0 atau handle lain
+        Printk(KWARN, "Return 0 at virt to phys simple\n");
+        return 0;
+    }
 }
