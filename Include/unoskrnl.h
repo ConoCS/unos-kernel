@@ -14,7 +14,6 @@
 
 // Interrupts
 #include "kernel/idt/idt.h"
-#include "kernel/idt/errornumber/errnum.h"
 
 // Drivers
 #include "drivers/keyboard.h"
@@ -51,9 +50,16 @@
 
 // Userland
 #include "userland/userland.h"
+#include "userland/syscall/syscall.h"
+#include "userland/syscall/wrmsr/wrmsr.h"
 
-// Utilities
+// Utilities and PANIC LOGGING
 #include <kstring.h>    // only the header, not .c!
 #include <com.h>
+#include "kernel/logging/printk/printk.h"
+#include "kernel/logging/panic/panic.h"
+
+// ASM Related function
+#include "kernel/asm/asm.h"
 
 #endif // UNOS_H
