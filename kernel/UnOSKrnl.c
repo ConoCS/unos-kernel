@@ -72,6 +72,7 @@ FUNCNOSTATUS KernelPreSetup(IN BOOT_INFO *Info) {
     serial_printf("LAPIC Bus Hz: %u\n", bus_hz);
     LAPICEnable();
     InitWatchdog(0, 200, "UnOSKrnl", WDCallback);
+    SetupSyscallWrmsr(SyscallHandlerWrapper);
 } 
 
 __attribute__((noreturn))
@@ -99,8 +100,15 @@ FUNCNOSTATUS KernelMain(BOOT_INFO *BootInfoArg) {
     InitPSFFontGraphic();
     PreparingGlobalPSFFont();
     PSFPrintf("Copyright UnOS Team 2025 C All Right Reserved\n");
+    Printk(KSUCCESS, "UnOS Started\n");
+    SetCursorMiddle();
+    PrintCentered("Test centered\n");
+    ResetLastCursorTTY();
 
     DisableWatchdogWhile(WatchdogUnOSKrnl);
+
+    //dump_pte_for_vaddr(0x410000);
+    UnGoToUserland("/UnOS/System64/App/Userland/test.elf");
 
     init_terminal();
 

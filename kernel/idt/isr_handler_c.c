@@ -42,10 +42,7 @@ void isr1_handler_c() {
 
 __attribute__((interrupt))
 void isr13_handler_c(struct interrupt_frame *frame, uint64_t error_code) {
-    RaiseKernelPanicError(error_code, CPU_FAULT_ACTIVATE_GENERAL_PROTECTION);
-    serial_print("EXCEPTION: Exception happened\n");
-    serial_print("PLEASE HARD RESET YOUR COMPUTER. THE KERNEL IS HALTING\n\n");
-    serial_print("ERROR: CPU_FAULT_ACTIVATE_GENERAL_PROTECTION\n");
+    Panic(CPU_FAULT_ACTIVATE_GENERAL_PROTECTION);
     while(1) {
         __asm__("hlt");
     }
@@ -56,7 +53,7 @@ void isr14_handler_c(uint64_t error_code) {
     serial_print("EXCEPTION: Exception happened \n");
     serial_print("PLEASE HARD RESET YOUR COMPUTER. THE KERNEL IS HALTING\n\n");
     serial_print("ERROR: MEMORY_PAGE_FAULT_PAGE_UNREADY\n");
-    serial_printf("Error Code: %X\n", error_code);
+    serial_printf("Error Code: 0x%X\n", error_code);
     short_pause();
     RaiseKernelPanicError(error_code, MEMORY_PAGE_FAULT_PAGE_UNREADY);
 

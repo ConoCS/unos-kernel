@@ -43,11 +43,16 @@
   *      or instability in the kernel caused by this module.
   *
   *  Revision History:
-  *      No revisions yet.
+  *      Sunday 10 August 2025: Adding map_virtual_userland to ElfLoad64
   */
 
 #define UNOS_ELF_USERLAND_MACRO
 #include <unoskrnl.h>
+
+#define PF_X 0x1  // Execute permission
+#define PF_W 0x2  // Write permission
+#define PF_R 0x4  // Read permission
+
 
 UNSTATUS
 ELFLOAD
@@ -66,19 +71,91 @@ Elf64Load(
 
     for(UINT i = 0; i < ehdr->e_phnum; i++) {
         if(phdr[i].p_type == PT_LOAD) {
-            VPTR dest = (VPTR)(UINTN)phdr[i].p_paddr;
+            USINT64 segment_size = phdr[i].p_memsz;
+            USINT64 file_size = phdr[i].p_filesz;
+            USINT64 virtual_addr = phdr[i].p_vaddr;
+            USINT64 offset_in_file = phdr[i].p_offset;
 
-            VPTR src = (VPTR)((USINT8*)elfData + phdr[i].p_offset);
+            // align virtual address down and size up to page size
+            USINT64 vaddr_page = virtual_addr & ~(PAGE_SIZE - 1);
+            USINT64 size_page = ((virtual_addr + segment_size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1)) - vaddr_page;
 
-            memcpy(dest, src, phdr[i].p_filesz);
+            // alok dan mapping halaman physical nya sebanyak segment_size
+            for(USINT64 off = 0; off < size_page; off += PAGE_SIZE) {
+                void* phys_page = palloc_page();
+                memset(phys_page, 0, PAGE_SIZE);
 
-            if(phdr[i].p_memsz > phdr[i].p_filesz) {
-                memset((USINT8*)dest + phdr[i].p_filesz, 0, 
-                        phdr[i].p_memsz - phdr[i].p_filesz);
+                uint64_t page_flags = 0;
+                page_flags = PAGE_PRESENT | PAGE_USER | PAGE_WRITABLE;  // always present & user
+                if (phdr[i].p_flags & PF_W) page_flags |= PAGE_WRITABLE;
+                Printk(KINFO, "Before clear NX: page_flags = 0x%x\n", page_flags);
+                if (phdr[i].p_flags & PF_X) {
+                    page_flags &= ~PAGE_NX;
+                    Printk(KINFO, "After clear NX: page_flags = 0x%x\n", page_flags);
+                } else {
+                    page_flags |= PAGE_NX;
+                    Printk(KINFO, "After set NX: page_flags = 0x%x\n", page_flags);
+                }
+                Printk(KINFO, "PAGE_NX = 0x%x\n", (unsigned long long)PAGE_NX);
+
+                Printk(KINFO, "Error that will hapenn next: map_virtual_user_advanced\n");
+                Printk(KINFO, "PF macros: PRESENT=0x%x WRIT=0x%x USER=0x%x NX=0x%x\n",
+                    (unsigned long long)PAGE_PRESENT,
+                    (unsigned long long)PAGE_WRITABLE,
+                    (unsigned long long)PAGE_USER,
+                    (unsigned long long)PAGE_NX);
+                Printk(KINFO, "page_flags computed = 0x%x\n", (unsigned long long)page_flags);
+                map_virtual_user_advanced(vaddr_page + off, (USINT64)phys_page, PAGE_SIZE, page_flags);
+                Printk(KINFO,"Error not in map_virtual_user_advanced\n");
             }
+
+            Printk(KINFO, "Or maybe in here?\n");
+            Printk(KINFO, "vaddr_page value: %llu, virtual_addr value: %llu", vaddr_page, virtual_addr);
+            memcpy((VOID*)(vaddr_page), (USINT8*)elfData + offset_in_file, file_size);
+            Printk(KINFO, "I guess not\n");
         }
     }
     return STATUS_OK;
 }
+
+UNFUNCTION
+UnGoToUserland(IN CONST CHARA8 *path) {
+    VFSNode *elf = Fat32Open(vfs_root, path);
+    if(!elf || elf->type != VFS_TYPE_FILE) {
+        Printk(KERR, "UnGoToUserland: Not a type of Userland app\n");
+        Panic(FAILED_INITIALIZATION_USERLAND);
+    }
+
+    Printk(KINFO, "Debug: File size: %llu bytes", elf->size);
+
+    size_t file_size = elf->size;
+    void *buffer = kmalloc(file_size);
+    if(!buffer) {
+        Printk(KERR, "UnGoToUserland: Error malloc\n");
+        Panic(FAILED_INITIALIZATION_USERLAND);
+    }
+
+    Printk(KINFO, "UnGoToUserland: Buffer allocated at %p\n", buffer);
+
+    int read_bytes = Fat32Read(elf, 0, buffer, file_size);
+    if(!read_bytes || (size_t)read_bytes != file_size){
+        Printk(KERR, "UnGoToUserland: Error reading an Userland file\n");
+        Panic(FAILED_INITIALIZATION_USERLAND);
+    }
+
+    Printk(KSUCCESS, "UnGoToUserland: Succesfully init Userland\n");
+
+    Elf64Load(buffer);
+
+    Elf64_Ehdr* ehdr = (Elf64_Ehdr*)buffer;
+    UINTN entry_point = (UINTN)ehdr->e_entry;
+
+    UINTN user_stack_top = USERLAND_STACK_TOP;
+
+    serial_printf("Checkpoint A\n");
+
+    UnStartUserland((VPTR)entry_point, (VPTR)user_stack_top);
+}
+
 
 

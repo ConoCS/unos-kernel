@@ -1,0 +1,18 @@
+#ifndef PANIC
+#define PANIC
+
+#include <unostype.h>
+
+typedef enum {
+    WATCHDOG_TIMEOUT_TIMER_EXCEPTION, // 21
+    MEMORY_PAGE_FAULT_PAGE_UNREADY, // 22
+    CPU_FAULT_ACTIVATE_GENERAL_PROTECTION, // 23
+    KERNEL_PANIC_ERROR, // 24
+    UNEXPECTED_KERNEL_ERROR, // 25
+    FAILED_INITIALIZATION_USERLAND
+} KernelPanic;
+
+UNFUNCTION
+Panic(IN KernelPanic ErrorLevel);
+
+#endif
